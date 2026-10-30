@@ -314,6 +314,7 @@ void cmdPUSH(processor_t *APM){
     APM->IP += 2;
 }
 
+/*
 void cmdPOP(processor_t *APM){
     int *pop = (int *)malloc(sizeof(int));
     StackPop(APM->stackFrame, pop);
@@ -322,6 +323,7 @@ void cmdPOP(processor_t *APM){
 
     free(pop);
 }
+*/
 
 void cmdPUSHR(processor_t *APM){
 

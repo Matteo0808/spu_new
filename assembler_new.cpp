@@ -6,17 +6,19 @@
 #include "stack.hpp"
 #include "strhandler.hpp"
 
-const int labelSize = 16;
 
-enum cmd_type{
-    CMD_LABEL,
-    CMD_MEMORY
-};
+
+const int labelSize = 16;
 
 enum number_of_args{
     NOT_A_CMD = -1,
     NO_ARGS = 0,
     ONE_ARG = 1
+};
+
+struct label_t{
+    const char *labelName;
+    int number;
 };
 
 struct assembler_t{
@@ -29,22 +31,38 @@ struct assembler_t{
     int LP;
 };
 
-struct label_t{
-    const char *str;
-    int num;
-};
-
 struct instruction_t{
     commands cmd;
     int arg;
 };
 
+struct command_t{
+    const char *cmdName;
+    commands cmdNumber;
+    int cmdHash;
+};
+
+
+
 void AssemblerConstructor(assembler_t *assembler, int lines, int labelSize);
 void DoubleAssembling(assembler_t *assembler, strInfo_t *env);
 void Assembling(assembler_t *assembler, strInfo_t *env);
+void AssemblerDestructor(assembler_t *assembler);
 
+void CreateCode(assembler_t *assembler);//TODO - remake binary;
+
+number_of_args IsCommand(assembler_t *assembler, instruction_t *instruction, const char *str);
+void GetArgument(assembler_t *assembler, instruction_t *instruction, const char *str);
+bool IsLabel(assembler_t *assembler, const char *str);
+int GetLabel(assembler_t *assembler, const char *str);
+void CreateLabel(assembler_t *assembler, const char *str);
+void GetMemoryArg(instruction_t *instruction, const char *str);
+int GetRegister(const char *str);
+commands GetCommand(const char *str);
 commands CheckCmdWithoutArgument(commands cmd);
-
+commands CheckCmdWithArgument(commands cmd);
+commands CheckLabelCommands(commands cmd);
+commands CheckMemoryCommands(commands cmd);
 
 int main(int argc, char *argv[]){
 
@@ -52,19 +70,31 @@ int main(int argc, char *argv[]){
         assert(0);
     }
 
+    printf("debug0\n");
+
     strInfo_t env = TextProcessingAsm(argv[1]);
+
+    printf("debug1\n");
 
     assembler_t assembler = {};
 
+    printf("debug2\n");
+
     AssemblerConstructor(&assembler, env.arrLinesSize, labelSize);
+
+    printf("debug3\n");
 
     DoubleAssembling(&assembler, &env); //TODO - createcodefunc in
 
+    printf("debug4\n");
+
     AssemblerDestructor(&assembler);
 
-    TextDestructor(&env);
+    printf("debug5\n");
 
+    StrInfoDestructor(&env);
     
+    printf("debug6\n");
 }
 
 
@@ -87,12 +117,55 @@ void DoubleAssembling(assembler_t *assembler, strInfo_t *env){
     assert(assembler != NULL);
     assert(env != NULL);
 
-    Assembling(assembler, env);
+    printf("asm1\n");
+
+    assembler->byteCodeLen = env->arrLinesSize;
+
+    assembler->byteCode = (int *)calloc(assembler->byteCodeLen, sizeof(int));
 
     Assembling(assembler, env);
+
+    printf("asm2\n");
+
+    Assembling(assembler, env);
+
+    printf("asm3\n");
+
+    printf("byteCodeLen = %d\n", assembler->byteCodeLen);
+
+    for (int i = 0; i < assembler->byteCodeLen; i++){
+        printf("%d ", assembler->byteCode[i]);
+    }
 
     CreateCode(assembler);
 
+    printf("asm4\n");
+}
+
+void CreateCode(assembler_t *assembler){
+    FILE *fileOut = fopen("code.txt", "w");
+
+    for(int index = 0; index < assembler->byteCodeLen; index++){
+        fprintf(fileOut, "%d ", assembler->byteCode[index]);
+    }
+    
+    fclose(fileOut);
+}
+
+void AssemblerDestructor(assembler_t *assembler){
+    assert(assembler != NULL);
+
+    assembler->byteCodeLen = 0;
+    assembler->IP = 0;
+    assembler->labelSize = 0;
+    assembler->LP = 0;
+
+    if(assembler->byteCode != NULL){
+        free(assembler->byteCode);
+    }
+    if(assembler->labels != NULL){
+        free(assembler->labels);
+    }
 }
 
 void Assembling(assembler_t *assembler, strInfo_t *env){
@@ -103,32 +176,44 @@ void Assembling(assembler_t *assembler, strInfo_t *env){
 
     instruction_t instruction = {cmdError, argError};
 
-    for(int index = 0; index < env->arrLinesSize; index++){
+    for(assembler->IP = 0; assembler->IP < env->arrLinesSize; assembler->IP++){
 
-        number_of_args checkCmd = IsCommand(assembler, &instruction, env->arrLines[index].line);
+        printf("in asm: i = [%d]\n", assembler->IP);
+
+        number_of_args checkCmd = IsCommand(assembler, &instruction, env->arrLines[assembler->IP].line);
+
+        printf("check cmd = [%d]\n", checkCmd);
+        printf("cmd = [%d]\n", (int)instruction.cmd);
 
         if(checkCmd == ONE_ARG){
-            GetArgument(assembler, &instruction, env->arrLines[index + 1].line);
+            printf("case 1 arg:\n");
+
+            GetArgument(assembler, &instruction, env->arrLines[assembler->IP + 1].line);
 
             assembler->byteCode[assembler->IP    ] = (int)instruction.cmd;
             assembler->byteCode[assembler->IP + 1] = (int)instruction.arg;
-            assembler->IP += 2;
+            assembler->IP++;
 
             continue;
         }
-        else if(checkCmd = NO_ARGS){
+        else if(checkCmd == NO_ARGS){
+            printf("case 0 arg:\n");
+
             assembler->byteCode[assembler->IP] = (int)instruction.cmd;
-            assembler->IP++;
             
             continue;
         }
 
-        if(IsLabel(assembler, env->arrLines[index].line)){
-            CreateLabel(assembler, env->arrLines[index].line);
+        if(IsLabel(assembler, env->arrLines[assembler->IP].line)){
+            printf("case label:\n");
+
+            CreateLabel(assembler, env->arrLines[assembler->IP].line);
+
             continue;
         }
 
         else{
+            printf("case poshel nahui:\n");
             assert(0);
         }
     }
@@ -136,6 +221,7 @@ void Assembling(assembler_t *assembler, strInfo_t *env){
 
 number_of_args IsCommand(assembler_t *assembler, instruction_t *instruction, const char *str){
     assert(assembler != NULL);
+    assert(instruction != NULL);
     assert(str != NULL);
 
     instruction->cmd = GetCommand(str);
@@ -147,6 +233,9 @@ number_of_args IsCommand(assembler_t *assembler, instruction_t *instruction, con
         if(CheckCmdWithArgument(instruction->cmd) != cmdError){
             return ONE_ARG;
         }
+        else{
+            return NOT_A_CMD;
+        }
     }
     else{
         return NOT_A_CMD;
@@ -154,14 +243,23 @@ number_of_args IsCommand(assembler_t *assembler, instruction_t *instruction, con
 }
 
 void GetArgument(assembler_t *assembler, instruction_t *instruction, const char *str){
+    assert(assembler != NULL);
+    assert(instruction != NULL);
+    assert(str != NULL);
+    
     int tempInt = 0;
     char tempStr[16] = "";
-    if(sscanf(str, "%d", tempInt) == 1){
+
+    printf("str in get arg = [%s]\n", str);
+
+    if(sscanf(str, "%d", &tempInt) == 1){
+        printf("case alpha:\n");
         instruction->arg = tempInt;
         return;
     }
 
     if(str[0] == ':'){
+        printf("case label arg:\n");
         if(CheckLabelCommands(instruction->cmd) != cmdError){
             instruction->arg = GetLabel(assembler, str + 1);
         }
@@ -169,8 +267,9 @@ void GetArgument(assembler_t *assembler, instruction_t *instruction, const char 
     }
 
     if(str[0] == '['){
+        printf("case memory arg:\n");
         if(CheckMemoryCommands(instruction->cmd) != cmdError){
-            instruction->arg = GetMemoryArg(instruction, str + 1);
+            GetMemoryArg(instruction, str + 1);
         }
         return;
     }
@@ -182,6 +281,7 @@ void GetArgument(assembler_t *assembler, instruction_t *instruction, const char 
     instruction->arg = GetRegister(tempStr);
 
     if(instruction->arg != argError){
+        printf("case reg arg:\n");
         return;
     }
     else{
@@ -189,21 +289,49 @@ void GetArgument(assembler_t *assembler, instruction_t *instruction, const char 
     }
 }
 
-int GetLabel(assembler_t *assembler, const char *str){
-    for(int index = 0; index < assembler->labelSize; index++){
-        if(index = assembler->labelSize - 1){
-            if(strcmp(str, assembler->labels[index].str) != 0){
-                return -1;
-            }
-        }
-        if(strcmp(str, assembler->labels[index].str) != 0){
-            continue;
-        }
-        return assembler->labels[index].num;
+bool IsLabel(assembler_t *assembler, const char *str){
+    assert(assembler != NULL);
+    assert(str != NULL);
+
+    if(str[0] == ':'){
+        return true;      
+    }
+
+    else{
+        return false;
     }
 }
 
-int GetMemoryArg(instruction_t *instruction, const char *str){
+void CreateLabel(assembler_t *assembler, const char *str){
+    assert(assembler != NULL);
+    assert(str != NULL);
+
+    assembler->labels[assembler->LP].labelName = str;
+    assembler->LP++;
+}
+
+int GetLabel(assembler_t *assembler, const char *str){
+    assert(assembler != NULL);
+    assert(str != NULL);
+
+    for(int index = 0; index < assembler->labelSize; index++){
+        if(index = assembler->labelSize - 1){
+            if(strcmp(str, assembler->labels[index].labelName) != 0){
+                return -1;
+            }
+        }
+        if(strcmp(str, assembler->labels[index].labelName) != 0){
+            continue;
+        }
+        return assembler->labels[index].number;
+    }
+    return -1;
+}
+
+void GetMemoryArg(instruction_t *instruction, const char *str){
+    assert(instruction != NULL);
+    assert(str != NULL);
+
     char tempInt = 0;
     char tempChr = 0;
 
@@ -247,6 +375,8 @@ int GetMemoryArg(instruction_t *instruction, const char *str){
 }
 
 int GetRegister(const char *str){
+    assert(str != NULL);
+
     if(strcmp(str, "AX") == 0){
         return R_AX;
     }
@@ -267,16 +397,9 @@ int GetRegister(const char *str){
     }
 }
 
-bool IsLabel(assembler_t *assembler, const char *str){
-    assert(assembler != NULL);
+commands GetCommand(const char *str){
     assert(str != NULL);
 
-    if(str[0] == ':'){
-        str++;        
-    }
-}
-
-commands GetCommand(const char *str){
     if(strcmp(str, "HLT") == 0){
         return HLT;
     }
@@ -433,12 +556,6 @@ commands CheckCmdWithArgument(commands cmd){
             return cmdError;
     }
 }
-
-b CreateLabel(assembler_t *assembler, char *str){
-    
-}
-
-
 
 commands CheckLabelCommands(commands cmd){
     switch(cmd){
