@@ -1,16 +1,20 @@
 #include <stdio.h>
 #include <time.h>
+#include <sys/stat.h>
+
+//#define PROCESSOR_DEBUG_MODE
+
+#ifdef PROCESSOR_DEBUG_MODE
+    #define PROCESSOR_DEBUG(...) __VA_ARGS__
+#else
+    #define PROCESSOR_DEBUG(...)
+#endif
 
 #include "stack.hpp"
-
-#define ONE_LINE_BUFFER
-
 #include "strhandler.hpp"
 #include "config.hpp"
 
-const int VRAM = 64;
-const int width = 17; //TODO - move in struct processor
-const int hight = 8;
+const int VRAMptr = 64;
 
 enum drawMode{
     consoleBin = 1,
@@ -18,7 +22,7 @@ enum drawMode{
     graphicsRaylib = 3
 };
 
-struct processor{
+struct processor_t{
     stack_t *stackFrame;
     stack_t *labelRecursion;
 
@@ -26,184 +30,173 @@ struct processor{
     int codeLen;
     int IP;
 
-    int Registers[5];
+    int Registers[4];
 
-    int RAM[VRAM + width * hight]; //    64 + 17x8 покачто
+    int *RAM;
+    int VRAMptr;
+    int width;
+    int hight;
 };
 
 
 
-void ProcessorConstructor(processor *APM);
-void ProcessorDestructor(processor *APM);
+void ProcessorConstructor(processor_t *APM, int width, int hight);
+void LoadFile(processor_t *APM, const char *fileInName);
+int GetCodeLen(const char *fileName);
+void Processing(processor_t *APM);
+void ProcessorDestructor(processor_t *APM);
+void DoInstruction(processor_t *APM);
 
 
-void LoadFile(processor *APM, const char *fileName);
-void CreateCode(processor *APM, strInfo *programInfo);
-void GetCodeLen(processor *APM, strInfo *programInfo);
-void CreateCodeList(processor *APM, strInfo *programInfo);
 
-void Processing(processor *APM);
-void DoInstruction(processor *APM);
+void cmdIN(processor_t *APM);
+void cmdOUT(processor_t *APM);
+void cmdPUSH(processor_t *APM);
+void cmdPUSHR(processor_t *APM);
+void cmdPOPR(processor_t *APM);
+void cmdPUSHM(processor_t *APM);
+void cmdPOPM(processor_t *APM);
+void cmdPUSHRM(processor_t *APM);
+void cmdPOPRM(processor_t *APM);
+void cmdADD(processor_t *APM);
+void cmdSUB(processor_t *APM);
+void cmdMUL(processor_t *APM);
+void cmdDIV(processor_t *APM);
+void cmdPOW(processor_t *APM);
+void cmdJMP(processor_t *APM);
+void cmdJA(processor_t *APM);
+void cmdJAE(processor_t *APM);
+void cmdJB(processor_t *APM);
+void cmdJBE(processor_t *APM);
+void cmdJE(processor_t *APM);
+void cmdJNE(processor_t *APM);
+void cmdJSUN(processor_t *APM);
+void cmdDRAW(processor_t *APM);
+void cmdCALL(processor_t *APM);
+void cmdRET(processor_t *APM);
+void cmdFACT(processor_t *APM);
+void cmdFIB(processor_t *APM);
 
-void cmdIN(processor *APM);
-void cmdOUT(processor *APM);
-void cmdPUSH(processor *APM);
-void cmdPOP(processor *APM);
-void cmdPUSHR(processor *APM);
-void cmdPOPR(processor *APM);
-void cmdPUSHM(processor *APM);
-void cmdPOPM(processor *APM);
-void cmdPUSHRM(processor *APM);
-void cmdPOPRM(processor *APM);
-void cmdADD(processor *APM);
-void cmdSUB(processor *APM);
-void cmdMUL(processor *APM);
-void cmdDIV(processor *APM);
-void cmdPOW(processor *APM);
-void cmdJMP(processor *APM);
-void cmdJA(processor *APM);
-void cmdJAE(processor *APM);
-void cmdJB(processor *APM);
-void cmdJBE(processor *APM);
-void cmdJE(processor *APM);
-void cmdJNE(processor *APM);
-void cmdJSUN(processor *APM);
-void cmdDRAW(processor *APM);
-void cmdCALL(processor *APM);
-void cmdRET(processor *APM);
-void cmdFACT(processor *APM);
-void cmdFIB(processor *APM);
-
-void _cmdDrawConsoleBin(processor *APM);
-void _cmdDrawConsoleChar(processor *APM);
+void _cmdDrawConsoleBin(processor_t *APM);
+void _cmdDrawConsoleChar(processor_t *APM);
 
 int _cmdFactorial(int num);
 int _cmdFibonacci(int num);
 
 
 
-//ASK - str labels?
-
-//ASK - temp var?
-
-
-
-//TODO - refactor translator
-//TODO - str labels
-//TODO - do binary
-//TODO - refactor all
-
-
 int main(){
 
-    processor APM = {};
+    processor_t APM = {};
 
-    ProcessorConstructor(&APM);
+    PROCESSOR_DEBUG(printf("debug1\n");)
 
-    LoadFile(&APM, "code.txt");
+    ProcessorConstructor(&APM, 10, 10);
 
-DEBUG(
-    for(int i = 0; i < APM->codeLen; i++){
-        printf("instruction %d: [%d]\n", i, APM->code[i]);
-    }
-)
+    PROCESSOR_DEBUG(printf("debug2\n");)
+
+    LoadFile(&APM, "code.bin");
+
+    PROCESSOR_DEBUG(printf("debug3\n");)
 
     Processing(&APM);
 
+    PROCESSOR_DEBUG(printf("debug4\n");)
+
     ProcessorDestructor(&APM);
+
+    PROCESSOR_DEBUG(printf("debug5\n");)
 
     return 0;
 }
 
+void ProcessorConstructor(processor_t *APM, const int width, const int hight){
+    assert(APM != NULL);
 
-void LoadFile(processor *APM, const char *fileName){
+    APM->VRAMptr = VRAMptr;
+    APM->width = width;
+    APM->hight = hight;
 
-    strInfo env = {};
-
-    //env = (strInfo *)calloc(1, sizeof(strInfo));
-
-    env.fileName = fileName;
-
-    OpenInFile(env);
-
-    ReadInFile(env);
-
-    CreateCode(APM, env);
-
-    free(env);
-}
-
-void ProcessorConstructor(processor *APM){    
-
-    APM->IP = 0;
-
-    APM->codeLen = 0;
-
-    APM->code = NULL;
+    APM->RAM = (int *)calloc(APM->VRAMptr + APM->width * APM->hight, sizeof(int));
+    if(APM->RAM == NULL){
+        assert(0);
+    }
 
     APM->stackFrame = StackConstructor(globalMinCapacity, "stackFrame");
-
     APM->labelRecursion = StackConstructor(globalMinCapacity, "labelRecursion");
 }
 
-void CreateCode(processor *APM, strInfo *programInfo){
+void LoadFile(processor_t *APM, const char *fileInName){
+    assert(APM != NULL);
+    assert(fileInName != NULL);
 
-    GetCodeLen(APM, programInfo);    
-
-    CreateCodeList(APM, programInfo);
-
-}
-
-void GetCodeLen(processor *APM, strInfo *programInfo){
-    int temp = 0;
-    int skip = 0;
-    int index = 0;
-    char* ptr = programInfo->buffer;
-
-    while(sscanf(ptr, "%d %n", &temp, &skip)){
-
-        index++;
-
-        ptr += skip;
-    }
-
-    APM->codeLen = index;
-
-}
-
-void CreateCodeList(processor *APM, strInfo *programInfo){
+    APM->codeLen = GetCodeLen(fileInName);
 
     APM->code = (int *)calloc(APM->codeLen, sizeof(int));
-
-    int temp = 0;
-    int skip = 0;
-    int index = 0;
-    char* ptr = programInfo->buffer;
-
-    while(sscanf(ptr, "%d %n", &temp, &skip)){
-
-        APM->code[index] = temp;
-        index++;
-
-        ptr += skip;
+    if(APM->code == NULL){
+        assert(0);
     }
+
+    FILE *binaryFp = fopen(fileInName, "rb");
+
+    fread(APM->code, sizeof(int), APM->codeLen, binaryFp);
+
+    fclose(binaryFp);
 }
 
-void Processing(processor *APM){
+int GetCodeLen(const char *fileName){
+    assert(fileName != NULL);
+
+    struct stat fileStat = {};
+
+    if(stat(fileName, &fileStat) == -1){
+        return -1;
+    }
+
+    return fileStat.st_size / sizeof(int);
+}
+
+void Processing(processor_t *APM){
+    assert(APM != NULL);
 
     while(APM->code[APM->IP]){
+        PROCESSOR_DEBUG(
+            printf("IP = %d\n", APM->IP);
+            printf("Cmd = %d\n", APM->code[APM->IP]);
+        )
         DoInstruction(APM);
     }
-
 }
 
-void DoInstruction(processor *APM){
+void ProcessorDestructor(processor_t *APM){
+    assert(APM != NULL);
+
+    APM->codeLen = 0;
+    APM->width = 0;
+    APM->hight = 0;
+    APM->VRAMptr = 0;
+    APM->IP = 0;
+
+    if(APM->code != NULL){
+        free(APM->code);
+    }
+    if(APM->RAM != NULL){
+        free(APM->RAM);
+    }    
+
+    StackDestructor(APM->stackFrame);
+    StackDestructor(APM->labelRecursion);
+}
+
+void DoInstruction(processor_t *APM){
+    assert(APM != NULL);
+
     switch (APM->code[APM->IP]){
-        case ERR:
-            abort();
+        case cmdError:
+            assert(0);
 
         case HLT:
-            abort();
+            exit(0);
 
         case IN:
             cmdIN(APM);
@@ -215,10 +208,6 @@ void DoInstruction(processor *APM){
 
         case PUSH:
             cmdPUSH(APM);
-            return;
-
-        case POP:
-            cmdPOP(APM);
             return;
 
         case PUSHR:
@@ -322,7 +311,7 @@ void DoInstruction(processor *APM){
     }
 }
 
-void cmdIN(processor *APM){
+void cmdIN(processor_t *APM){
     int in = 0;
     if(scanf("%d", &in) == 1){
         StackPush(APM->stackFrame, &in);
@@ -330,11 +319,11 @@ void cmdIN(processor *APM){
     }
     else{
         printf("Invalid input\n");
-        abort();
+        assert(0);
     }
 }
 
-void cmdOUT(processor *APM){   
+void cmdOUT(processor_t *APM){   
     int out = 0;
     StackPop(APM->stackFrame, &out);
 
@@ -343,64 +332,55 @@ void cmdOUT(processor *APM){
     APM->IP++;
 }
 
-void cmdPUSH(processor *APM){
+void cmdPUSH(processor_t *APM){
     StackPush(APM->stackFrame, &(APM->code[APM->IP + 1]));
 
     APM->IP += 2;
 }
 
-void cmdPOP(processor *APM){
-    int *pop = (int *)malloc(sizeof(int));
-    StackPop(APM->stackFrame, pop);
-
-    APM->IP++;
-
-    free(pop);
-}
-
-void cmdPUSHR(processor *APM){
+void cmdPUSHR(processor_t *APM){
 
     StackPush(APM->stackFrame, &(APM->Registers[APM->code[APM->IP + 1]]));
 
     APM->IP += 2;
 }
 
-void cmdPOPR(processor *APM){
+void cmdPOPR(processor_t *APM){
 
     StackPop(APM->stackFrame, &(APM->Registers[APM->code[APM->IP + 1]]));
 
     APM->IP += 2;
 }
 
-void cmdPUSHM(processor *APM){
+void cmdPUSHM(processor_t *APM){
 
     StackPush(APM->stackFrame, &(APM->RAM[APM->code[APM->IP + 1]]));
 
     APM->IP += 2;
 }
 
-void cmdPOPM(processor *APM){
+void cmdPOPM(processor_t *APM){
 
     StackPop(APM->stackFrame, &(APM->RAM[APM->code[APM->IP + 1]]));
 
     APM->IP += 2;
 }
 
-void cmdPUSHRM(processor *APM){
+void cmdPUSHRM(processor_t *APM){
 
     StackPush(APM->stackFrame, &(APM->RAM[APM->Registers[APM->code[APM->IP + 1]]]));
 
     APM->IP += 2;
 }
 
-void cmdPOPRM(processor *APM){
+void cmdPOPRM(processor_t *APM){
 
     StackPop(APM->stackFrame, &(APM->RAM[APM->Registers[APM->code[APM->IP + 1]]]));
 
     APM->IP += 2;
 }
 
-void cmdADD(processor *APM){
+void cmdADD(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -413,7 +393,7 @@ void cmdADD(processor *APM){
     APM->IP++;
 }
 
-void cmdSUB(processor *APM){
+void cmdSUB(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -426,7 +406,7 @@ void cmdSUB(processor *APM){
     APM->IP++;
 }
 
-void cmdMUL(processor *APM){
+void cmdMUL(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -439,7 +419,7 @@ void cmdMUL(processor *APM){
     APM->IP++;
 }
 
-void cmdDIV(processor *APM){
+void cmdDIV(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -452,7 +432,7 @@ void cmdDIV(processor *APM){
     APM->IP++;
 }
 
-void cmdPOW(processor *APM){
+void cmdPOW(processor_t *APM){
     int elem = 0;
     StackPop(APM->stackFrame, &elem);
 
@@ -467,11 +447,11 @@ void cmdPOW(processor *APM){
     APM->IP += 2;
 }
 
-void cmdJMP(processor *APM){
+void cmdJMP(processor_t *APM){
     APM->IP = APM->code[APM->IP + 1];
 }
 
-void cmdJA(processor *APM){
+void cmdJA(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -489,7 +469,7 @@ void cmdJA(processor *APM){
     StackPush(APM->stackFrame, &elem2);
 }
 
-void cmdJAE(processor *APM){
+void cmdJAE(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -507,7 +487,7 @@ void cmdJAE(processor *APM){
     StackPush(APM->stackFrame, &elem2);
 }
 
-void cmdJB(processor *APM){
+void cmdJB(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -525,7 +505,7 @@ void cmdJB(processor *APM){
     StackPush(APM->stackFrame, &elem2);
 }
 
-void cmdJBE(processor *APM){
+void cmdJBE(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -543,7 +523,7 @@ void cmdJBE(processor *APM){
     StackPush(APM->stackFrame, &elem2);
 }
 
-void cmdJE(processor *APM){
+void cmdJE(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -561,7 +541,7 @@ void cmdJE(processor *APM){
     StackPush(APM->stackFrame, &elem2);
 }
 
-void cmdJNE(processor *APM){
+void cmdJNE(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -579,7 +559,7 @@ void cmdJNE(processor *APM){
     StackPush(APM->stackFrame, &elem2);
 }
 
-void cmdJSUN(processor *APM){
+void cmdJSUN(processor_t *APM){
     
     time_t varTime = time(NULL);
 
@@ -592,7 +572,7 @@ void cmdJSUN(processor *APM){
         APM->IP += 2;
     }
 }
-void cmdDRAW(processor *APM){
+void cmdDRAW(processor_t *APM){
     if(APM->code[APM->IP + 1] == consoleBin){
         _cmdDrawConsoleBin(APM);
     }
@@ -600,7 +580,7 @@ void cmdDRAW(processor *APM){
     APM->IP += 2;
 }
 
-void cmdCALL(processor *APM){
+void cmdCALL(processor_t *APM){
 
     int newIP = APM->IP + 2;
 
@@ -609,12 +589,12 @@ void cmdCALL(processor *APM){
     cmdJMP(APM);
 }
 
-void cmdRET(processor *APM){
+void cmdRET(processor_t *APM){
 
     StackPop(APM->labelRecursion, &(APM->IP));
 }
 
-void cmdFACT(processor *APM){
+void cmdFACT(processor_t *APM){
     int elem = 0;
     StackPop(APM->stackFrame, &elem);
 
@@ -625,7 +605,7 @@ void cmdFACT(processor *APM){
 
 }
 
-void cmdFIB(processor *APM){
+void cmdFIB(processor_t *APM){
     int elem = 0;
     StackPop(APM->stackFrame, &elem);
 
@@ -635,10 +615,10 @@ void cmdFIB(processor *APM){
     APM->IP++;
 }
 
-void _cmdDrawConsoleBin(processor *APM){
-    for(int  i = 0; i < hight; i++){
-        for(int j = 0; j < width; j++){
-            if(APM->RAM[VRAM + width * i + j] == 0){            
+void _cmdDrawConsoleBin(processor_t *APM){
+    for(int  i = 0; i < APM->hight; i++){
+        for(int j = 0; j < APM->width; j++){
+            if(APM->RAM[APM->VRAMptr + APM->width * i + j] == 0){            
                 printf(".");
             }
             else{
@@ -649,16 +629,20 @@ void _cmdDrawConsoleBin(processor *APM){
     }
 }
 
-void _cmdDrawConsoleChar(processor *APM){
-    for(int  i = 0; i < hight; i++){
-        for(int j = 0; j < width; j++){
-            printf("%c", APM->RAM[VRAM + width * i + j]);
+void _cmdDrawConsoleChar(processor_t *APM){
+    for(int  i = 0; i < APM->hight; i++){
+        for(int j = 0; j < APM->width; j++){
+            printf("%c", APM->RAM[APM->VRAMptr + APM->width * i + j]);
         }
         printf("\n");
     }
 }
 
 int _cmdFactorial(int num){
+    assert(num >= 0);
+    if(num == 0){
+        return 1;
+    }
     if(num == 1){
         return 1;
     }
@@ -668,20 +652,13 @@ int _cmdFactorial(int num){
 }
 
 int _cmdFibonacci(int num){
-    if(num == 1){
-        return 1;
+    if(num == 0){
+        return 0;
     }
-    if(num == 2){
+    if(num == 1){
         return 1;
     }
     else{
         return _cmdFibonacci(num - 1) + _cmdFibonacci(num - 2);
     }
-}
-
-void ProcessorDestructor(processor *APM){
-
-    StackDestructor(APM->stackFrame);
-
-    StackDestructor(APM->labelRecursion);
 }
