@@ -7,7 +7,7 @@
 
 //#define DEBUG_MODE
 #define CANARY_PROTECTION
-#define HASH_PROTECTION
+//#define HASH_PROTECTION
 
 #ifdef DEBUG_MODE
     #define DEBUG(...) __VA_ARGS__
@@ -630,7 +630,10 @@ void _StackPop(stack_t *stk, stackType *elem, const char *callFile, const char *
     ErrorSuccess err = RETURN_SUCCESS;
     
     err = _StackVerify(stk, callFile, callFunc, callLine);
-
+    if(stk->size <= 0){
+        printf("trying to pop from empty stack\n");
+        assert(0);
+    }
     stk->size--;
 
     if(4 * stk->size <= stk->capacity && stk->capacity > globalMinCapacity){

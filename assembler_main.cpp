@@ -15,7 +15,7 @@
 #include "strhandler.hpp"
 
 const int labelSize = 16;
-const int global_cmdNumber = 29 - 6;
+const int global_cmdNumber = 30 - 6;
 
 enum number_of_args{
     NOT_A_CMD = -1,
@@ -123,11 +123,13 @@ int main(int argc, char *argv[]){
 
 void AssemblerConstructor(assembler_t *assembler, command_t **cmds, int lines, int labelSize){
     assert(assembler != NULL);
+    assert(cmds != NULL);
     assert(lines != 0);
     assert(labelSize != 0);
 
     assembler->byteCodeLen = lines * 2;
     assembler->byteCode = (int *)calloc(assembler->byteCodeLen, sizeof(int));
+    
     if(assembler->byteCode == NULL){
         assert(0);
     }
@@ -145,6 +147,7 @@ void AssemblerConstructor(assembler_t *assembler, command_t **cmds, int lines, i
     }
 
     *cmds = CreateCmdsStructure();
+
     HashCount(*cmds);
 }
 
@@ -168,6 +171,7 @@ command_t *CreateCmdsStructure(){
         {"MUL",    MUL,    0},
         {"DIV",    DIV,    0},
         {"POW",    POW,    0},
+        {"SQRT",   SQRT,   0},
         {"JMP",    JMP,    0},
         {"JA",     JA,     0},
         {"JAE",    JAE,    0},
@@ -238,6 +242,8 @@ void CreateBinary(assembler_t *assembler){
     if(fileOut == NULL){
         assert(0);
     }
+
+    fwrite(global_signature, global_signatureLength, 1, fileOut);
 
     if(fwrite(assembler->byteCode, sizeof(int), assembler->byteCodeLen, fileOut) <= 0){
         assert(0);
@@ -456,7 +462,7 @@ void GetMemoryArg(instruction_t *instruction, const char *str){
     assert(instruction != NULL);
     assert(str != NULL);
 
-    char tempInt = 0;
+    int tempInt = 0;
     char tempChr = 0;
 
     int check = sscanf(str, "%d]%c", &tempInt, &tempChr);
@@ -561,6 +567,8 @@ commands CheckCmdWithoutArgument(commands cmd){
             return FACT;
         case FIB:
             return FIB;
+        case SQRT:
+            return SQRT;
         default:
             return cmdError;
     }

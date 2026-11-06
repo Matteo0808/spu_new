@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <math.h>
+#include "C:\raylib\raylib\src\raylib.h"
 
 //#define PROCESSOR_DEBUG_MODE
 
@@ -11,15 +13,18 @@
 #endif
 
 #include "stack.hpp"
-#include "strhandler.hpp"
 #include "config.hpp"
 
+const int eps = 100;
 const int VRAMptr = 64;
+const int window_width = 1280;
+const int window_height = 960;
 
 enum drawMode{
     consoleBin = 1,
     consoleChar = 2,
-    graphicsRaylib = 3
+    graphicRaylibBW = 3,
+    graphicRaylibRGB = 4
 };
 
 struct processor_t{
@@ -35,12 +40,12 @@ struct processor_t{
     int *RAM;
     int VRAMptr;
     int width;
-    int hight;
+    int height;
 };
 
 
 
-void ProcessorConstructor(processor_t *APM, int width, int hight);
+void ProcessorConstructor(processor_t *APM, int width, int height);
 void LoadFile(processor_t *APM, const char *fileInName);
 int GetCodeLen(const char *fileName);
 void Processing(processor_t *APM);
@@ -63,6 +68,7 @@ void cmdSUB(processor_t *APM);
 void cmdMUL(processor_t *APM);
 void cmdDIV(processor_t *APM);
 void cmdPOW(processor_t *APM);
+void cmdSQRT(processor_t *APM);
 void cmdJMP(processor_t *APM);
 void cmdJA(processor_t *APM);
 void cmdJAE(processor_t *APM);
@@ -79,6 +85,8 @@ void cmdFIB(processor_t *APM);
 
 void _cmdDrawConsoleBin(processor_t *APM);
 void _cmdDrawConsoleChar(processor_t *APM);
+void _cmdDrawGraphicWindowBW(processor_t *APM);
+void _cmdDrawGraphicWindowRGB(processor_t *APM);
 
 int _cmdFactorial(int num);
 int _cmdFibonacci(int num);
@@ -91,7 +99,7 @@ int main(){
 
     PROCESSOR_DEBUG(printf("debug1\n");)
 
-    ProcessorConstructor(&APM, 10, 10);
+    ProcessorConstructor(&APM, window_width, window_height);
 
     PROCESSOR_DEBUG(printf("debug2\n");)
 
@@ -110,14 +118,14 @@ int main(){
     return 0;
 }
 
-void ProcessorConstructor(processor_t *APM, const int width, const int hight){
+void ProcessorConstructor(processor_t *APM, const int width, const int height){
     assert(APM != NULL);
 
     APM->VRAMptr = VRAMptr;
     APM->width = width;
-    APM->hight = hight;
+    APM->height = height;
 
-    APM->RAM = (int *)calloc(APM->VRAMptr + APM->width * APM->hight, sizeof(int));
+    APM->RAM = (int *)calloc(APM->VRAMptr + APM->width * APM->height, sizeof(int));
     if(APM->RAM == NULL){
         assert(0);
     }
@@ -139,6 +147,11 @@ void LoadFile(processor_t *APM, const char *fileInName){
 
     FILE *binaryFp = fopen(fileInName, "rb");
 
+    if(fseek(binaryFp, global_signatureLength, SEEK_SET) != 0){
+        fclose(binaryFp);
+        assert(0);
+    }
+
     fread(APM->code, sizeof(int), APM->codeLen, binaryFp);
 
     fclose(binaryFp);
@@ -153,7 +166,7 @@ int GetCodeLen(const char *fileName){
         return -1;
     }
 
-    return fileStat.st_size / sizeof(int);
+    return (fileStat.st_size - global_signatureLength) / sizeof(int);
 }
 
 void Processing(processor_t *APM){
@@ -173,7 +186,7 @@ void ProcessorDestructor(processor_t *APM){
 
     APM->codeLen = 0;
     APM->width = 0;
-    APM->hight = 0;
+    APM->height = 0;
     APM->VRAMptr = 0;
     APM->IP = 0;
 
@@ -252,6 +265,10 @@ void DoInstruction(processor_t *APM){
 
         case POW:
             cmdPOW(APM);
+            return;
+
+        case SQRT:
+            cmdSQRT(APM);
             return;
         
         case DRAW:
@@ -423,6 +440,10 @@ void cmdDIV(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
+    if(elem2 == 0){
+        assert(0);
+    }
+
     int elem1 = 0;
     StackPop(APM->stackFrame, &elem1);
 
@@ -447,6 +468,18 @@ void cmdPOW(processor_t *APM){
     APM->IP += 2;
 }
 
+void cmdSQRT(processor_t *APM){
+    int elem = 0;
+    StackPop(APM->stackFrame, &elem);
+
+    int res = (int)(sqrt(elem));
+
+    StackPush(APM->stackFrame, &res);
+
+    APM->IP++;
+    
+}
+
 void cmdJMP(processor_t *APM){
     APM->IP = APM->code[APM->IP + 1];
 }
@@ -465,8 +498,8 @@ void cmdJA(processor_t *APM){
         APM->IP += 2;
     }
 
-    StackPush(APM->stackFrame, &elem1);
-    StackPush(APM->stackFrame, &elem2);
+    // StackPush(APM->stackFrame, &elem1);
+    // StackPush(APM->stackFrame, &elem2);
 }
 
 void cmdJAE(processor_t *APM){
@@ -483,8 +516,8 @@ void cmdJAE(processor_t *APM){
         APM->IP += 2;
     }
 
-    StackPush(APM->stackFrame, &elem1);
-    StackPush(APM->stackFrame, &elem2);
+    // StackPush(APM->stackFrame, &elem1);
+    // StackPush(APM->stackFrame, &elem2);
 }
 
 void cmdJB(processor_t *APM){
@@ -501,8 +534,8 @@ void cmdJB(processor_t *APM){
         APM->IP += 2;
     }
 
-    StackPush(APM->stackFrame, &elem1);
-    StackPush(APM->stackFrame, &elem2);
+    // StackPush(APM->stackFrame, &elem1);
+    // StackPush(APM->stackFrame, &elem2);
 }
 
 void cmdJBE(processor_t *APM){
@@ -519,8 +552,8 @@ void cmdJBE(processor_t *APM){
         APM->IP += 2;
     }
 
-    StackPush(APM->stackFrame, &elem1);
-    StackPush(APM->stackFrame, &elem2);
+    // StackPush(APM->stackFrame, &elem1);
+    // StackPush(APM->stackFrame, &elem2);
 }
 
 void cmdJE(processor_t *APM){
@@ -537,8 +570,8 @@ void cmdJE(processor_t *APM){
         APM->IP += 2;
     }
 
-    StackPush(APM->stackFrame, &elem1);
-    StackPush(APM->stackFrame, &elem2);
+    // StackPush(APM->stackFrame, &elem1);
+    // StackPush(APM->stackFrame, &elem2);
 }
 
 void cmdJNE(processor_t *APM){
@@ -555,8 +588,8 @@ void cmdJNE(processor_t *APM){
         APM->IP += 2;
     }
 
-    StackPush(APM->stackFrame, &elem1);
-    StackPush(APM->stackFrame, &elem2);
+    // StackPush(APM->stackFrame, &elem1);
+    // StackPush(APM->stackFrame, &elem2);
 }
 
 void cmdJSUN(processor_t *APM){
@@ -575,6 +608,15 @@ void cmdJSUN(processor_t *APM){
 void cmdDRAW(processor_t *APM){
     if(APM->code[APM->IP + 1] == consoleBin){
         _cmdDrawConsoleBin(APM);
+    }
+    if(APM->code[APM->IP + 1] == consoleChar){
+        _cmdDrawConsoleChar(APM);
+    }
+    if(APM->code[APM->IP + 1] == graphicRaylibBW){
+        _cmdDrawGraphicWindowBW(APM);
+    }
+    if(APM->code[APM->IP + 1] == graphicRaylibRGB){
+        _cmdDrawGraphicWindowRGB(APM);
     }
 
     APM->IP += 2;
@@ -616,7 +658,7 @@ void cmdFIB(processor_t *APM){
 }
 
 void _cmdDrawConsoleBin(processor_t *APM){
-    for(int  i = 0; i < APM->hight; i++){
+    for(int  i = 0; i < APM->height; i++){
         for(int j = 0; j < APM->width; j++){
             if(APM->RAM[APM->VRAMptr + APM->width * i + j] == 0){            
                 printf(".");
@@ -630,12 +672,39 @@ void _cmdDrawConsoleBin(processor_t *APM){
 }
 
 void _cmdDrawConsoleChar(processor_t *APM){
-    for(int  i = 0; i < APM->hight; i++){
+    for(int  i = 0; i < APM->height; i++){
         for(int j = 0; j < APM->width; j++){
             printf("%c", APM->RAM[APM->VRAMptr + APM->width * i + j]);
         }
         printf("\n");
     }
+}
+void _cmdDrawGraphicWindowBW(processor_t *APM){
+    InitWindow(APM->width, APM->height, "Black and White");
+
+    while(!WindowShouldClose()){
+        BeginDrawing();
+
+            ClearBackground(RAYWHITE);
+
+            for(int y = 0; y < APM->height; y++){
+                for(int x = 0; x < APM->width; x++){
+                    if(APM->RAM[VRAMptr + y * APM->width + x] == 67){
+                        DrawPixel(x, y, WHITE);
+                    }
+                    else{
+                        DrawPixel(x, y, BLACK);
+                    }
+                }
+            }
+
+        EndDrawing();
+    }
+
+    CloseWindow();
+}
+void _cmdDrawGraphicWindowRGB(processor_t *APM){
+    printf("in progress\n");
 }
 
 int _cmdFactorial(int num){
