@@ -87,7 +87,7 @@ strInfo_t TextProcessingAsm(const char *fileInName){
 
     OpenFile(&env);
 
-    OutputBuffer(&env);
+    //OutputBuffer(&env);
 
     STRHANDLER_DEBUG(printf("text_debug2\n");)
 

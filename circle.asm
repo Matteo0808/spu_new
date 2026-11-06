@@ -22,7 +22,7 @@ PUSH 64
 POP [4]
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;;;;;;;;;;;;;;;;;;;;;;;; RADIUS
+;;;;;;;;;;;;;;;;;;;;;;;;; RADIUS^2
 PUSH 100
 PUSH 100
 MUL
@@ -43,7 +43,7 @@ POP AX
 PUSH AX
 PUSH 960
 
-JA :CYCLE_HEIGHT_BREAK
+JAE :CYCLE_HEIGHT_BREAK
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; X_COORDINATE_INIT
 PUSH 0
@@ -55,7 +55,7 @@ POP BX
 PUSH BX
 PUSH 1280
 
-JA :CYCLE_WIDTH_BREAK
+JAE :CYCLE_WIDTH_BREAK
 
 ;;;;;;;;;;;;;;;;;;;;;;;;; COUNT_DISTANCE
 PUSH AX

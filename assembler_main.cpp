@@ -2,7 +2,7 @@
 #include <string.h>
 #include <assert.h>
 
-#define ASSEMBLER_DEBUG_MODE
+//#define ASSEMBLER_DEBUG_MODE
 
 #ifdef ASSEMBLER_DEBUG_MODE
     #define STRHANDLER_DEBUG_MODE
@@ -221,7 +221,8 @@ ssize_t HashDJB(const char *str){
 void DoubleAssembling(assembler_t *assembler, strInfo_t *env, command_t *cmds){
     assert(assembler != NULL);
     assert(env != NULL);
-
+    assert(cmds != NULL);
+    
     Assembling(assembler, env, cmds);
 
     Assembling(assembler, env, cmds);
@@ -271,7 +272,7 @@ void AssemblerDestructor(assembler_t *assembler){
 void Assembling(assembler_t *assembler, strInfo_t *env, command_t *cmds){
     assert(assembler != NULL);
     assert(env != NULL);
-
+    assert(cmds != NULL);
     assembler->IP = 0;
 
     instruction_t instruction = {cmdError, argError};
