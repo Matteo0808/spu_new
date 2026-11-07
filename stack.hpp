@@ -99,7 +99,7 @@ const char *GetLineStatus(stack_status status);
 const char *GetLineError(stackErrorList status);
 
 
-void _StackPush(stack_t *stk, stackType *elem, const char *callFile, const char *callFunc, ssize_t callLine);
+void _StackPush(stack_t *stk, stackType elem, const char *callFile, const char *callFunc, ssize_t callLine);
 void _StackPop(stack_t *stk, stackType *elem, const char *callFile, const char *callFunc, ssize_t callLine);
 
 void StackResizeUp(stack_t *stk, const char *callFile, const char *callFunc, ssize_t callLine);
@@ -588,14 +588,14 @@ const char *GetLineError(stackErrorList error){
 }
 
 
-void _StackPush(stack_t *stk, stackType *elem, const char *callFile, const char *callFunc, ssize_t callLine){
+void _StackPush(stack_t *stk, stackType elem, const char *callFile, const char *callFunc, ssize_t callLine){
     
     ErrorSuccess err = RETURN_SUCCESS;
 
     err = _StackVerify(stk, callFile, callFunc, callLine);
     
     if(stk->size < stk->capacity){
-        stk->data[stk->size] = *elem;
+        stk->data[stk->size] = elem;
         stk->size++;
     }
     else{
@@ -603,7 +603,7 @@ void _StackPush(stack_t *stk, stackType *elem, const char *callFile, const char 
 
         StackResizeUp(stk, callFile, callFunc, callLine);
 
-        stk->data[stk->size] = *elem;
+        stk->data[stk->size] = elem;
         stk->size++;
     }
 

@@ -337,7 +337,7 @@ processor_errorList DoInstruction(processor_t *APM){
 processor_errorList cmdIN(processor_t *APM){
     int in = 0;
     if(scanf("%d", &in) == 1){
-        StackPush(APM->stackFrame, &in);
+        StackPush(APM->stackFrame, in);
         APM->IP++;
         return PROCESSOR_NO_ERROR;
     }
@@ -358,7 +358,7 @@ processor_errorList cmdOUT(processor_t *APM){
 }
 
 processor_errorList cmdPUSH(processor_t *APM){
-    StackPush(APM->stackFrame, &(APM->code[APM->IP + 1])); //TODO - 
+    StackPush(APM->stackFrame, APM->code[APM->IP + 1]);
 
     APM->IP += 2;
 
@@ -367,7 +367,7 @@ processor_errorList cmdPUSH(processor_t *APM){
 
 processor_errorList cmdPUSHR(processor_t *APM){
 
-    StackPush(APM->stackFrame, &(APM->Registers[APM->code[APM->IP + 1]]));
+    StackPush(APM->stackFrame, APM->Registers[APM->code[APM->IP + 1]]);
 
     APM->IP += 2;
 
@@ -385,7 +385,7 @@ processor_errorList cmdPOPR(processor_t *APM){
 
 processor_errorList cmdPUSHM(processor_t *APM){
 
-    StackPush(APM->stackFrame, &(APM->RAM[APM->code[APM->IP + 1]]));
+    StackPush(APM->stackFrame, APM->RAM[APM->code[APM->IP + 1]]);
 
     APM->IP += 2;
 
@@ -403,7 +403,7 @@ processor_errorList cmdPOPM(processor_t *APM){
 
 processor_errorList cmdPUSHRM(processor_t *APM){
 
-    StackPush(APM->stackFrame, &(APM->RAM[APM->Registers[APM->code[APM->IP + 1]]]));
+    StackPush(APM->stackFrame, APM->RAM[APM->Registers[APM->code[APM->IP + 1]]]);
 
     APM->IP += 2;
 
@@ -427,7 +427,7 @@ processor_errorList cmdADD(processor_t *APM){
     StackPop(APM->stackFrame, &elem1);
 
     int add = elem1 + elem2;
-    StackPush(APM->stackFrame, &add);
+    StackPush(APM->stackFrame, add);
 
     APM->IP++;
 
@@ -442,7 +442,7 @@ processor_errorList cmdSUB(processor_t *APM){
     StackPop(APM->stackFrame, &elem1);
 
     int sub = elem1 - elem2;
-    StackPush(APM->stackFrame, &sub);
+    StackPush(APM->stackFrame, sub);
 
     APM->IP++;
 
@@ -457,7 +457,7 @@ processor_errorList cmdMUL(processor_t *APM){
     StackPop(APM->stackFrame, &elem1);
 
     int mul = elem1 * elem2;
-    StackPush(APM->stackFrame, &mul);
+    StackPush(APM->stackFrame, mul);
 
     APM->IP++;
 
@@ -476,7 +476,7 @@ processor_errorList cmdDIV(processor_t *APM){
     StackPop(APM->stackFrame, &elem1);
 
     int div = elem1 / elem2;
-    StackPush(APM->stackFrame, &div);
+    StackPush(APM->stackFrame, div);
 
     APM->IP++;
 
@@ -493,7 +493,7 @@ processor_errorList cmdPOW(processor_t *APM){
         res *= elem;
     }
 
-    StackPush(APM->stackFrame, &res);
+    StackPush(APM->stackFrame, res);
 
     APM->IP += 2;
 
@@ -505,7 +505,7 @@ processor_errorList cmdSQRT(processor_t *APM){
     StackPop(APM->stackFrame, &elem);
 
     int res = (int)(sqrt(elem));
-    StackPush(APM->stackFrame, &res);
+    StackPush(APM->stackFrame, res);
 
     APM->IP++;
     
@@ -651,7 +651,7 @@ processor_errorList cmdDRAW(processor_t *APM){
 processor_errorList cmdCALL(processor_t *APM){
 
     int newIP = APM->IP + 2;
-    StackPush(APM->labelRecursion, &newIP);
+    StackPush(APM->labelRecursion, newIP);
     
     cmdJMP(APM);
 
@@ -670,7 +670,7 @@ processor_errorList cmdFACT(processor_t *APM){
     StackPop(APM->stackFrame, &elem);
 
     int fact = _cmdFactorial(elem);
-    StackPush(APM->stackFrame, &fact);
+    StackPush(APM->stackFrame, fact);
 
     APM->IP++;
 
@@ -682,7 +682,7 @@ processor_errorList cmdFIB(processor_t *APM){
     StackPop(APM->stackFrame, &elem);
 
     int fib = _cmdFibonacci(elem);
-    StackPush(APM->stackFrame, &fib);
+    StackPush(APM->stackFrame, fib);
 
     APM->IP++;
 
