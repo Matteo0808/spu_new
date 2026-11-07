@@ -36,10 +36,8 @@
 #define StackDump(stk) _StackDump(stk, STACK_IS_OK, __FILE__, __FUNCTION__, __LINE__)
 
 static ssize_t globalDebugHashSum;
-
 const ssize_t globalFiasco = 0xF1A5C0;    //15836608
-
-const ssize_t globalMinCapacity = 5;
+const ssize_t global_minCapacity = 5;
 
 #ifdef CANARY_PROTECTION
 
@@ -331,7 +329,7 @@ stackErrorList StackCheckErrors(const stack_t *stk){
 
 #endif
 
-    if(stk->capacity < globalMinCapacity){
+    if(stk->capacity < global_minCapacity){
         return CAPACITY_LOWER_MINIMAL;
     }
     
@@ -636,7 +634,7 @@ void _StackPop(stack_t *stk, stackType *elem, const char *callFile, const char *
     }
     stk->size--;
 
-    if(4 * stk->size <= stk->capacity && stk->capacity > globalMinCapacity){
+    if(4 * stk->size <= stk->capacity && stk->capacity > global_minCapacity){
         DEBUG(StackDump(stk);)
 
         StackResizeDown(stk, callFile, callFunc, callLine);

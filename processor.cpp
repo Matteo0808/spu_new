@@ -15,10 +15,25 @@
 #include "stack.hpp"
 #include "config.hpp"
 
-const int eps = 100;
-const int VRAMptr = 64;
-const int window_width = 1280;
-const int window_height = 960;
+const size_t global_VRAMptr = 64;
+const size_t global_windowWidth = 1280;
+const size_t global_windowHeight = 960;
+
+
+
+enum processor_errorList{
+    PROCESSOR_NO_ERROR = 0,
+    PROCESSOR_ERROR_RAM_ALLOCATION,
+    PROCESSOR_ERROR_FILESIZE,
+    PROCESSOR_ERROR_CODE_ALLOCATION,
+    PROCESSOR_ERROR_BINARY_OPEN,
+    PROCESSOR_ERROR_BINARY_FSEEK,
+    PROCESSOR_ERROR_BINARY_FREAD,
+    PROCESSOR_ERROR_INVALID_COMMAND,
+    PROCESSOR_ERROR_INVALID_INPUT,
+    PROCESSOR_ERROR_ZERO_DIVISION,
+
+};
 
 enum drawMode{
     consoleBin = 1,
@@ -32,56 +47,54 @@ struct processor_t{
     stack_t *labelRecursion;
 
     int *code;
-    int codeLen;
+    size_t codeLen;
     int IP;
 
     int Registers[4];
 
     int *RAM;
-    int VRAMptr;
-    int width;
-    int height;
+    size_t VRAMptr;
+    size_t width;
+    size_t height;
 };
 
 
 
-void ProcessorConstructor(processor_t *APM, int width, int height);
-void LoadFile(processor_t *APM, const char *fileInName);
-int GetCodeLen(const char *fileName);
-void Processing(processor_t *APM);
-void ProcessorDestructor(processor_t *APM);
-void DoInstruction(processor_t *APM);
+processor_errorList ProcessorConstructor(processor_t *APM, const size_t width, const size_t height);
+processor_errorList LoadFile(processor_t *APM, const char *fileInName);
+ssize_t GetCodeLen(const char *fileName);
+processor_errorList Processing(processor_t *APM);
+processor_errorList DoInstruction(processor_t *APM);
+processor_errorList ProcessorDestructor(processor_t *APM);
 
-
-
-void cmdIN(processor_t *APM);
-void cmdOUT(processor_t *APM);
-void cmdPUSH(processor_t *APM);
-void cmdPUSHR(processor_t *APM);
-void cmdPOPR(processor_t *APM);
-void cmdPUSHM(processor_t *APM);
-void cmdPOPM(processor_t *APM);
-void cmdPUSHRM(processor_t *APM);
-void cmdPOPRM(processor_t *APM);
-void cmdADD(processor_t *APM);
-void cmdSUB(processor_t *APM);
-void cmdMUL(processor_t *APM);
-void cmdDIV(processor_t *APM);
-void cmdPOW(processor_t *APM);
-void cmdSQRT(processor_t *APM);
-void cmdJMP(processor_t *APM);
-void cmdJA(processor_t *APM);
-void cmdJAE(processor_t *APM);
-void cmdJB(processor_t *APM);
-void cmdJBE(processor_t *APM);
-void cmdJE(processor_t *APM);
-void cmdJNE(processor_t *APM);
-void cmdJSUN(processor_t *APM);
-void cmdDRAW(processor_t *APM);
-void cmdCALL(processor_t *APM);
-void cmdRET(processor_t *APM);
-void cmdFACT(processor_t *APM);
-void cmdFIB(processor_t *APM);
+processor_errorList cmdIN(processor_t *APM);
+processor_errorList cmdOUT(processor_t *APM);
+processor_errorList cmdPUSH(processor_t *APM);
+processor_errorList cmdPUSHR(processor_t *APM);
+processor_errorList cmdPOPR(processor_t *APM);
+processor_errorList cmdPUSHM(processor_t *APM);
+processor_errorList cmdPOPM(processor_t *APM);
+processor_errorList cmdPUSHRM(processor_t *APM);
+processor_errorList cmdPOPRM(processor_t *APM);
+processor_errorList cmdADD(processor_t *APM);
+processor_errorList cmdSUB(processor_t *APM);
+processor_errorList cmdMUL(processor_t *APM);
+processor_errorList cmdDIV(processor_t *APM);
+processor_errorList cmdPOW(processor_t *APM);
+processor_errorList cmdSQRT(processor_t *APM);
+processor_errorList cmdJMP(processor_t *APM);
+processor_errorList cmdJA(processor_t *APM);
+processor_errorList cmdJAE(processor_t *APM);
+processor_errorList cmdJB(processor_t *APM);
+processor_errorList cmdJBE(processor_t *APM);
+processor_errorList cmdJE(processor_t *APM);
+processor_errorList cmdJNE(processor_t *APM);
+processor_errorList cmdJSUN(processor_t *APM);
+processor_errorList cmdDRAW(processor_t *APM);
+processor_errorList cmdCALL(processor_t *APM);
+processor_errorList cmdRET(processor_t *APM);
+processor_errorList cmdFACT(processor_t *APM);
+processor_errorList cmdFIB(processor_t *APM);
 
 void _cmdDrawConsoleBin(processor_t *APM);
 void _cmdDrawConsoleChar(processor_t *APM);
@@ -91,73 +104,90 @@ void _cmdDrawGraphicWindowRGB(processor_t *APM);
 int _cmdFactorial(int num);
 int _cmdFibonacci(int num);
 
-
+void ProcessorErrorProcessing(processor_errorList err);
 
 int main(){
 
+    processor_errorList err = PROCESSOR_NO_ERROR;
+
     processor_t APM = {};
 
-    PROCESSOR_DEBUG(printf("debug1\n");)
+    err = ProcessorConstructor(&APM, global_windowWidth, global_windowHeight);
+    if(err){
+        ProcessorErrorProcessing(err);
+        return 1;
+    }
 
-    ProcessorConstructor(&APM, window_width, window_height);
+    err = LoadFile(&APM, "code.bin");
+    if(err){
+        ProcessorErrorProcessing(err);
+        return 1;
+    }
 
-    PROCESSOR_DEBUG(printf("debug2\n");)
-
-    LoadFile(&APM, "code.bin");
-
-    PROCESSOR_DEBUG(printf("debug3\n");)
-
-    Processing(&APM);
-
-    PROCESSOR_DEBUG(printf("debug4\n");)
+    err = Processing(&APM);
+    if(err){
+        ProcessorErrorProcessing(err);
+        return 1;
+    }
 
     ProcessorDestructor(&APM);
-
-    PROCESSOR_DEBUG(printf("debug5\n");)
 
     return 0;
 }
 
-void ProcessorConstructor(processor_t *APM, const int width, const int height){
+processor_errorList ProcessorConstructor(processor_t *APM, const size_t width, const size_t height){
     assert(APM != NULL);
 
-    APM->VRAMptr = VRAMptr;
+    APM->VRAMptr = global_VRAMptr;
     APM->width = width;
     APM->height = height;
 
     APM->RAM = (int *)calloc(APM->VRAMptr + APM->width * APM->height, sizeof(int));
     if(APM->RAM == NULL){
-        assert(0);
+        return PROCESSOR_ERROR_RAM_ALLOCATION;
     }
 
-    APM->stackFrame = StackConstructor(globalMinCapacity, "stackFrame");
-    APM->labelRecursion = StackConstructor(globalMinCapacity, "labelRecursion");
+    APM->stackFrame = StackConstructor(global_minCapacity, "stackFrame");
+    APM->labelRecursion = StackConstructor(global_minCapacity, "labelRecursion");
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void LoadFile(processor_t *APM, const char *fileInName){
+processor_errorList LoadFile(processor_t *APM, const char *fileInName){
     assert(APM != NULL);
     assert(fileInName != NULL);
 
     APM->codeLen = GetCodeLen(fileInName);
+    if(APM->codeLen == -1){
+        return PROCESSOR_ERROR_FILESIZE;
+    }
 
     APM->code = (int *)calloc(APM->codeLen, sizeof(int));
     if(APM->code == NULL){
-        assert(0);
+        return PROCESSOR_ERROR_CODE_ALLOCATION;
     }
 
     FILE *binaryFp = fopen(fileInName, "rb");
+    if(binaryFp == NULL){
+        return PROCESSOR_ERROR_BINARY_OPEN;
+    }
 
     if(fseek(binaryFp, global_signatureLength, SEEK_SET) != 0){
         fclose(binaryFp);
-        assert(0);
+        return PROCESSOR_ERROR_BINARY_FSEEK;
     }
 
-    fread(APM->code, sizeof(int), APM->codeLen, binaryFp);
+    if(fread(APM->code, sizeof(int), APM->codeLen, binaryFp) <= 0){
+        fclose(binaryFp);
+        return PROCESSOR_ERROR_BINARY_FREAD;
+    }
 
     fclose(binaryFp);
+
+    return PROCESSOR_NO_ERROR;
 }
 
-int GetCodeLen(const char *fileName){
+ssize_t GetCodeLen(const char *fileName){
     assert(fileName != NULL);
 
     struct stat fileStat = {};
@@ -169,19 +199,26 @@ int GetCodeLen(const char *fileName){
     return (fileStat.st_size - global_signatureLength) / sizeof(int);
 }
 
-void Processing(processor_t *APM){
+processor_errorList Processing(processor_t *APM){
     assert(APM != NULL);
+
+    processor_errorList err = PROCESSOR_NO_ERROR;
 
     while(APM->code[APM->IP]){
         PROCESSOR_DEBUG(
             printf("IP = %d\n", APM->IP);
-            printf("Cmd = %d\n", APM->code[APM->IP]);
+            printf("Cmd = %lld\n", APM->code[APM->IP]);
         )
-        DoInstruction(APM);
+        err = DoInstruction(APM);
+        if(err){
+            return err;
+        }
     }
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void ProcessorDestructor(processor_t *APM){
+processor_errorList ProcessorDestructor(processor_t *APM){
     assert(APM != NULL);
 
     APM->codeLen = 0;
@@ -199,205 +236,190 @@ void ProcessorDestructor(processor_t *APM){
 
     StackDestructor(APM->stackFrame);
     StackDestructor(APM->labelRecursion);
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void DoInstruction(processor_t *APM){
+processor_errorList DoInstruction(processor_t *APM){
     assert(APM != NULL);
 
     switch (APM->code[APM->IP]){
-        case cmdError:
-            assert(0);
-
-        case HLT:
-            exit(0);
-
+        case HLT: return PROCESSOR_NO_ERROR;
         case IN:
             cmdIN(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case OUT:
             cmdOUT(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case PUSH:
             cmdPUSH(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case PUSHR:
             cmdPUSHR(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case POPR:
             cmdPOPR(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case PUSHM:
             cmdPUSHM(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case POPM:
             cmdPOPM(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case PUSHRM:
             cmdPUSHRM(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case POPRM:
             cmdPOPRM(APM);
-                return;
-
+            return PROCESSOR_NO_ERROR;
         case ADD:
             cmdADD(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case SUB:
             cmdSUB(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case MUL:
             cmdMUL(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case DIV:
             cmdDIV(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case POW:
             cmdPOW(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case SQRT:
             cmdSQRT(APM);
-            return;
-        
+            return PROCESSOR_NO_ERROR;        
         case DRAW:
             cmdDRAW(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case JMP:
             cmdJMP(APM);
-            return;
-        
+            return PROCESSOR_NO_ERROR;        
         case JA:
             cmdJA(APM);
-            return;
-        
+            return PROCESSOR_NO_ERROR;        
         case JAE:
             cmdJAE(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case JB:
             cmdJB(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case JBE:
             cmdJBE(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case JE:
             cmdJE(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case JNE:
             cmdJNE(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case JSUN:
             cmdJSUN(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case CALL:
             cmdCALL(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case RET:
             cmdRET(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case FACT:
             cmdFACT(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         case FIB:
             cmdFIB(APM);
-            return;
-
+            return PROCESSOR_NO_ERROR;
         default:
-            abort();
+            return PROCESSOR_ERROR_INVALID_COMMAND;
     }
 }
 
-void cmdIN(processor_t *APM){
+processor_errorList cmdIN(processor_t *APM){
     int in = 0;
     if(scanf("%d", &in) == 1){
         StackPush(APM->stackFrame, &in);
         APM->IP++;
+        return PROCESSOR_NO_ERROR;
     }
     else{
-        printf("Invalid input\n");
-        assert(0);
+        return PROCESSOR_ERROR_INVALID_INPUT;
     }
 }
 
-void cmdOUT(processor_t *APM){   
+processor_errorList cmdOUT(processor_t *APM){   
     int out = 0;
     StackPop(APM->stackFrame, &out);
 
     printf("<<%d>>\n", out);
 
     APM->IP++;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdPUSH(processor_t *APM){
-    StackPush(APM->stackFrame, &(APM->code[APM->IP + 1]));
+processor_errorList cmdPUSH(processor_t *APM){
+    StackPush(APM->stackFrame, &(APM->code[APM->IP + 1])); //TODO - 
 
     APM->IP += 2;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdPUSHR(processor_t *APM){
+processor_errorList cmdPUSHR(processor_t *APM){
 
     StackPush(APM->stackFrame, &(APM->Registers[APM->code[APM->IP + 1]]));
 
     APM->IP += 2;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdPOPR(processor_t *APM){
+processor_errorList cmdPOPR(processor_t *APM){
 
     StackPop(APM->stackFrame, &(APM->Registers[APM->code[APM->IP + 1]]));
 
     APM->IP += 2;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdPUSHM(processor_t *APM){
+processor_errorList cmdPUSHM(processor_t *APM){
 
     StackPush(APM->stackFrame, &(APM->RAM[APM->code[APM->IP + 1]]));
 
     APM->IP += 2;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdPOPM(processor_t *APM){
+processor_errorList cmdPOPM(processor_t *APM){
 
     StackPop(APM->stackFrame, &(APM->RAM[APM->code[APM->IP + 1]]));
 
     APM->IP += 2;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdPUSHRM(processor_t *APM){
+processor_errorList cmdPUSHRM(processor_t *APM){
 
     StackPush(APM->stackFrame, &(APM->RAM[APM->Registers[APM->code[APM->IP + 1]]]));
 
     APM->IP += 2;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdPOPRM(processor_t *APM){
+processor_errorList cmdPOPRM(processor_t *APM){
 
     StackPop(APM->stackFrame, &(APM->RAM[APM->Registers[APM->code[APM->IP + 1]]]));
 
     APM->IP += 2;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdADD(processor_t *APM){
+processor_errorList cmdADD(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -408,9 +430,11 @@ void cmdADD(processor_t *APM){
     StackPush(APM->stackFrame, &add);
 
     APM->IP++;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdSUB(processor_t *APM){
+processor_errorList cmdSUB(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -421,9 +445,11 @@ void cmdSUB(processor_t *APM){
     StackPush(APM->stackFrame, &sub);
 
     APM->IP++;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdMUL(processor_t *APM){
+processor_errorList cmdMUL(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -434,14 +460,16 @@ void cmdMUL(processor_t *APM){
     StackPush(APM->stackFrame, &mul);
 
     APM->IP++;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdDIV(processor_t *APM){
+processor_errorList cmdDIV(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
     if(elem2 == 0){
-        assert(0);
+        return PROCESSOR_ERROR_ZERO_DIVISION;
     }
 
     int elem1 = 0;
@@ -451,9 +479,11 @@ void cmdDIV(processor_t *APM){
     StackPush(APM->stackFrame, &div);
 
     APM->IP++;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdPOW(processor_t *APM){
+processor_errorList cmdPOW(processor_t *APM){
     int elem = 0;
     StackPop(APM->stackFrame, &elem);
 
@@ -466,25 +496,29 @@ void cmdPOW(processor_t *APM){
     StackPush(APM->stackFrame, &res);
 
     APM->IP += 2;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdSQRT(processor_t *APM){
+processor_errorList cmdSQRT(processor_t *APM){
     int elem = 0;
     StackPop(APM->stackFrame, &elem);
 
     int res = (int)(sqrt(elem));
-
     StackPush(APM->stackFrame, &res);
 
     APM->IP++;
     
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdJMP(processor_t *APM){
+processor_errorList cmdJMP(processor_t *APM){
     APM->IP = APM->code[APM->IP + 1];
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdJA(processor_t *APM){
+processor_errorList cmdJA(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -497,12 +531,10 @@ void cmdJA(processor_t *APM){
     else{
         APM->IP += 2;
     }
-
-    // StackPush(APM->stackFrame, &elem1);
-    // StackPush(APM->stackFrame, &elem2);
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdJAE(processor_t *APM){
+processor_errorList cmdJAE(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -515,12 +547,10 @@ void cmdJAE(processor_t *APM){
     else{
         APM->IP += 2;
     }
-
-    // StackPush(APM->stackFrame, &elem1);
-    // StackPush(APM->stackFrame, &elem2);
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdJB(processor_t *APM){
+processor_errorList cmdJB(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -533,12 +563,10 @@ void cmdJB(processor_t *APM){
     else{
         APM->IP += 2;
     }
-
-    // StackPush(APM->stackFrame, &elem1);
-    // StackPush(APM->stackFrame, &elem2);
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdJBE(processor_t *APM){
+processor_errorList cmdJBE(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -551,12 +579,10 @@ void cmdJBE(processor_t *APM){
     else{
         APM->IP += 2;
     }
-
-    // StackPush(APM->stackFrame, &elem1);
-    // StackPush(APM->stackFrame, &elem2);
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdJE(processor_t *APM){
+processor_errorList cmdJE(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -569,12 +595,10 @@ void cmdJE(processor_t *APM){
     else{
         APM->IP += 2;
     }
-
-    // StackPush(APM->stackFrame, &elem1);
-    // StackPush(APM->stackFrame, &elem2);
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdJNE(processor_t *APM){
+processor_errorList cmdJNE(processor_t *APM){
     int elem2 = 0;
     StackPop(APM->stackFrame, &elem2);
 
@@ -587,12 +611,10 @@ void cmdJNE(processor_t *APM){
     else{
         APM->IP += 2;
     }
-
-    // StackPush(APM->stackFrame, &elem1);
-    // StackPush(APM->stackFrame, &elem2);
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdJSUN(processor_t *APM){
+processor_errorList cmdJSUN(processor_t *APM){
     
     time_t varTime = time(NULL);
 
@@ -604,8 +626,10 @@ void cmdJSUN(processor_t *APM){
     else{
         APM->IP += 2;
     }
+    return PROCESSOR_NO_ERROR;
 }
-void cmdDRAW(processor_t *APM){
+
+processor_errorList cmdDRAW(processor_t *APM){
     if(APM->code[APM->IP + 1] == consoleBin){
         _cmdDrawConsoleBin(APM);
     }
@@ -620,23 +644,28 @@ void cmdDRAW(processor_t *APM){
     }
 
     APM->IP += 2;
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdCALL(processor_t *APM){
+processor_errorList cmdCALL(processor_t *APM){
 
     int newIP = APM->IP + 2;
-
     StackPush(APM->labelRecursion, &newIP);
     
     cmdJMP(APM);
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdRET(processor_t *APM){
+processor_errorList cmdRET(processor_t *APM){
 
     StackPop(APM->labelRecursion, &(APM->IP));
+
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdFACT(processor_t *APM){
+processor_errorList cmdFACT(processor_t *APM){
     int elem = 0;
     StackPop(APM->stackFrame, &elem);
 
@@ -645,9 +674,10 @@ void cmdFACT(processor_t *APM){
 
     APM->IP++;
 
+    return PROCESSOR_NO_ERROR;
 }
 
-void cmdFIB(processor_t *APM){
+processor_errorList cmdFIB(processor_t *APM){
     int elem = 0;
     StackPop(APM->stackFrame, &elem);
 
@@ -655,6 +685,8 @@ void cmdFIB(processor_t *APM){
     StackPush(APM->stackFrame, &fib);
 
     APM->IP++;
+
+    return PROCESSOR_NO_ERROR;
 }
 
 void _cmdDrawConsoleBin(processor_t *APM){
@@ -669,6 +701,7 @@ void _cmdDrawConsoleBin(processor_t *APM){
         }
         printf("\n");
     }
+
 }
 
 void _cmdDrawConsoleChar(processor_t *APM){
@@ -689,7 +722,7 @@ void _cmdDrawGraphicWindowBW(processor_t *APM){
 
             for(int y = 0; y < APM->height; y++){
                 for(int x = 0; x < APM->width; x++){
-                    if(APM->RAM[VRAMptr + y * APM->width + x] == 67){
+                    if(APM->RAM[global_VRAMptr + y * APM->width + x] == 67){
                         DrawPixel(x, y, WHITE);
                     }
                     else{
@@ -703,7 +736,7 @@ void _cmdDrawGraphicWindowBW(processor_t *APM){
 
     CloseWindow();
 }
-void _cmdDrawGraphicWindowRGB(processor_t *APM){
+void _cmdDrawGraphicWindowRGB(processor_t *APM){//TODO - ask amir
     printf("in progress\n");
 }
 
@@ -729,5 +762,34 @@ int _cmdFibonacci(int num){
     }
     else{
         return _cmdFibonacci(num - 1) + _cmdFibonacci(num - 2);
+    }
+}
+
+void ProcessorErrorProcessing(processor_errorList err){
+    switch(err){
+        case PROCESSOR_ERROR_BINARY_FREAD:
+            fprintf(stderr, "Error in fread in binary file\n");
+            return;
+        case PROCESSOR_ERROR_BINARY_FSEEK:
+            fprintf(stderr, "Error in fseek in binary file\n");
+            return;
+        case PROCESSOR_ERROR_BINARY_OPEN:
+            fprintf(stderr, "Error in fopen in binary file\n");
+            return;
+        case PROCESSOR_ERROR_CODE_ALLOCATION:
+            fprintf(stderr, "Error in code memory allocation\n");
+            return;
+        case PROCESSOR_ERROR_FILESIZE:
+            fprintf(stderr, "Error in fstat getting filesize\n");
+            return;
+        case PROCESSOR_ERROR_INVALID_COMMAND:
+            fprintf(stderr, "Invalid command in processing\n");
+            return;
+        case PROCESSOR_ERROR_RAM_ALLOCATION:
+            fprintf(stderr, "Error in RAM allocation\n");
+            return;
+        default:
+            printf("OK\n");
+            return;
     }
 }

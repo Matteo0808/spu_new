@@ -13,7 +13,18 @@
     #define STRHANDLER_DEBUG(...)
 #endif
 
+enum strhandler_errorList{
+    STRHANDLER_NO_ERROR = 0,
+    STRHANDLER_ERROR_FILESIZE,
+    STRHANDLER_ERROR_BUFFER_CREATE,
+    STRHANDLER_ERROR_FILEIN_OPEN,
+    STRHANDLER_ERROR_FILEIN_READ,
+    STRHANDLER_ERROR_ARRAY_MEMORY_ALLOCATION,
+    STRHANDLER_ERROR_FILEOUT_OPEN,
+    STHANDLER_ERROR_OUTPUTBUFFER_OPENFILE,
+    STRHANDLER_ERROR_OUTPUTBUFFER_WRITE,
 
+};
 
 struct line_t{
     const char* line;
@@ -36,117 +47,153 @@ struct strInfo_t{
 
 
 
-strInfo_t TextProcessing(const char *fileInName);
-strInfo_t TextProcessingAsm(const char *fileInName);
-
-strInfo_t StrInfoConstructor(const char *fileInName, const char *fileOutName);
-void OpenFile(strInfo_t *env);
-void BufferProcessing(strInfo_t *env);
-void BufferProcessingAsm(strInfo_t *env);
+void StrInfoConstructor(strInfo_t *env, const char *fileInName, const char *fileOutName);
 void StrInfoDestructor(strInfo_t *env);
 
-void OpenOutputFile(FILE **fileOut, const char *fileOutName);
-void TextOutput(strInfo_t *env);
-size_t GetFileSize(const char *fileName);
+strhandler_errorList TextProcessing(strInfo_t *env, const char *fileInName);
+strhandler_errorList TextProcessingAsm(strInfo_t *env, const char *fileInName);
+
+strhandler_errorList OpenFile(strInfo_t *env);
+strhandler_errorList BufferProcessing(strInfo_t *env);
+strhandler_errorList BufferProcessingAsm(strInfo_t *env);
+
+strhandler_errorList OpenOutputFile(FILE **fileOut, const char *fileOutName);
+ssize_t GetFileSize(const char *fileName);
 char *CreateBuffer(size_t bufSize);
-void ReadFileInBuffer(const char *fileName, char **buffer, size_t bufSize);
+strhandler_errorList ReadFileInBuffer(const char *fileName, char **buffer, size_t bufSize);
 size_t ChangeEndlinesToNulls(char *buffer, size_t bufSize);
 size_t ChangeEndlinesAndBackspacesToNulls_AndSkipComments(char *buffer, size_t bufSize);
 void SkipComments(char *buffer, size_t *index);
 void ChangeNullsToEndlines(char *buffer, size_t bufSize);
-void CreateArrayOfLines(strInfo_t *env);
+strhandler_errorList CreateArrayOfLines(strInfo_t *env);
 void BufferToLinesFragmentation(line_t *arrLines, char *buffer, size_t bufSize);
 void GetLensOfLines(line_t *arrLines, size_t arrSize);
 
-void OutputBuffer(strInfo_t *env);
+strhandler_errorList OutputBuffer(strInfo_t *env);
 void StrDump(strInfo_t *env);
 
 
-strInfo_t TextProcessing(const char *fileInName){
+strhandler_errorList TextProcessing(strInfo_t *env, const char *fileInName){
     assert(fileInName != NULL);
     
-    strInfo_t env = StrInfoConstructor(fileInName, "out.txt");
+    strhandler_errorList err = STRHANDLER_NO_ERROR;
 
-    OpenFile(&env);
+    StrInfoConstructor(env, fileInName, "out.txt");
 
-    BufferProcessing(&env);
+    err = OpenFile(env);
+    if(err){
+        return err;
+    }
 
-    return env;
+    err = BufferProcessing(env);
+    if(err){
+        return err;
+    }
+
+    return STRHANDLER_NO_ERROR;
 }
 
-strInfo_t TextProcessingAsm(const char *fileInName){
+strhandler_errorList TextProcessingAsm(strInfo_t *env, const char *fileInName){
+    assert(env != NULL);
     assert(fileInName != NULL);
 
-    STRHANDLER_DEBUG(printf("fileIn = [%s]\n", fileInName);)
+    strhandler_errorList err = STRHANDLER_NO_ERROR;
 
+    STRHANDLER_DEBUG(printf("fileIn = [%s]\n", fileInName);)
     STRHANDLER_DEBUG(printf("text_debug0\n");)
 
-    strInfo_t env = StrInfoConstructor(fileInName, "out.txt");
+    StrInfoConstructor(env, fileInName, "out.txt");
 
     STRHANDLER_DEBUG(printf("text_debug1\n");)
 
-    OpenFile(&env);
+    err = OpenFile(env);
+    if(err){
+        return err;
+    }
 
-    //OutputBuffer(&env);
+    // err = OutputBuffer(env);
+    // if(err){
+    //     return err;
+    // }
 
     STRHANDLER_DEBUG(printf("text_debug2\n");)
 
-    BufferProcessingAsm(&env);
+    err = BufferProcessingAsm(env);
+    if(err){
+        return err;
+    }
 
     STRHANDLER_DEBUG(printf("text_debug3\n");)
 
-    return env;
+    return STRHANDLER_NO_ERROR;
 }
 
-
-strInfo_t StrInfoConstructor(const char *fileInName, const char *fileOutName){
+void StrInfoConstructor(strInfo_t *env, const char *fileInName, const char *fileOutName){
     assert(fileInName != NULL);
     assert(fileOutName != NULL);
 
-    strInfo_t env = {};
+    env->fileInName = fileInName;
+    env->fileOutName = fileOutName;
+    env->fileOut = NULL;
 
-    env.fileInName = fileInName;
-    env.fileOutName = fileOutName;
-    env.fileOut = NULL;
+    env->arrLines = NULL;
+    env->arrLinesSize = 0;
 
-    env.arrLines = NULL;
-    env.arrLinesSize = 0;
+    env->buffer = NULL;
+    env->bufferSize = 0;
 
-    env.buffer = NULL;
-    env.bufferSize = 0;
-
-    env.error = 0;
-
-    return env;
+    env->error = 0;
 }
 
-void OpenFile(strInfo_t *env){
+strhandler_errorList OpenFile(strInfo_t *env){
     assert(env != NULL);
 
-    env->bufferSize = GetFileSize(env->fileInName);
+    ssize_t fileSize = GetFileSize(env->fileInName);
+    if(fileSize <= 0){
+        return STRHANDLER_ERROR_FILESIZE;
+    }
+    else{
+        env->bufferSize = (size_t)fileSize;
+    }
 
     env->buffer = CreateBuffer(env->bufferSize);
+    if(env->buffer == NULL){
+        return STRHANDLER_ERROR_BUFFER_CREATE;
+    }
 
-    ReadFileInBuffer(env->fileInName, &(env->buffer), env->bufferSize);
+    strhandler_errorList err = ReadFileInBuffer(env->fileInName, &(env->buffer), env->bufferSize);
+    if(err){
+        return err;
+    }
 
     env->buffer[env->bufferSize] = '\n';
 
     env->bufferSize++;
 
     STRHANDLER_DEBUG(printf("buffer after reading = [%s]\n", env->buffer);)
+
+    return STRHANDLER_NO_ERROR;
    
 }
 
-void BufferProcessing(strInfo_t *env){
+strhandler_errorList BufferProcessing(strInfo_t *env){
     assert(env != NULL);
+
+    strhandler_errorList err = STRHANDLER_NO_ERROR;
 
     env->arrLinesSize = ChangeEndlinesToNulls(env->buffer, env->bufferSize);
 
-    CreateArrayOfLines(env);
+    err = CreateArrayOfLines(env);
+    if(err){
+        return err;
+    }
+    return STRHANDLER_NO_ERROR;
 }
 
-void BufferProcessingAsm(strInfo_t *env){
+strhandler_errorList BufferProcessingAsm(strInfo_t *env){
     assert(env != NULL);
+
+    strhandler_errorList err = STRHANDLER_NO_ERROR;
 
     STRHANDLER_DEBUG(printf("text_proc_debug0\n");)
 
@@ -156,9 +203,13 @@ void BufferProcessingAsm(strInfo_t *env){
 
     STRHANDLER_DEBUG(printf("text_proc_debug1\n");)
 
-    CreateArrayOfLines(env);
-
+    err = CreateArrayOfLines(env);
+    if(err){
+        return err;
+    }
     STRHANDLER_DEBUG(printf("text_proc_debug3\n");)
+
+    return STRHANDLER_NO_ERROR;
 }
 
 void StrInfoDestructor(strInfo_t *env){
@@ -182,26 +233,18 @@ void StrInfoDestructor(strInfo_t *env){
 
 
 
-void OpenOutputFile(FILE **fileOut, const char *fileOutName){
+strhandler_errorList OpenOutputFile(FILE **fileOut, const char *fileOutName){
     assert(fileOut != NULL);
     assert(fileOutName != NULL);
 
     if((*fileOut = fopen(fileOutName, "a")) == NULL){
-        assert(0);
+        return STRHANDLER_ERROR_FILEOUT_OPEN;
     }
+
+    return STRHANDLER_NO_ERROR;
 }
 
-void TextOutput(strInfo_t *env){
-    assert(env != NULL);
-
-    ChangeNullsToEndlines(env->buffer, env->bufferSize);
-
-    if(fwrite(env->buffer, sizeof(char), env->bufferSize, env->fileOut) <= 0){
-        assert(0);
-    }
-}
-
-size_t GetFileSize(const char *fileName){
+ssize_t GetFileSize(const char *fileName){
     assert(fileName != NULL);
     struct stat fileStat = {};
 
@@ -222,14 +265,19 @@ char *CreateBuffer(size_t bufSize){
     return tempBuffer + 1;
 }
 
-void ReadFileInBuffer(const char *fileName, char **buffer, size_t bufSize){
+strhandler_errorList ReadFileInBuffer(const char *fileName, char **buffer, size_t bufSize){
     assert(fileName != NULL);
     assert(buffer != NULL);
 
     int fileInDescriptor = open(fileName, O_BINARY);
-    if (read(fileInDescriptor, *buffer, bufSize) <= 0){
-        assert(0);
+    if(fileInDescriptor == -1){
+        return STRHANDLER_ERROR_FILEIN_OPEN;
     }
+    if (read(fileInDescriptor, *buffer, bufSize) <= 0){
+        return STRHANDLER_ERROR_FILEIN_READ;
+    }
+
+    return STRHANDLER_NO_ERROR;
 }
 
 size_t ChangeEndlinesToNulls(char *buffer, size_t bufSize){
@@ -262,7 +310,7 @@ size_t ChangeEndlinesAndBackspacesToNulls_AndSkipComments(char *buffer, size_t b
     for(size_t index = 0; index < bufSize; index++){
 
         if((buffer[index - 1] == '\0') && (buffer[index] == ';')){
-            printf("skip full line\n");
+            STRHANDLER_DEBUG(printf("skip full line\n");)
             SkipComments(buffer, &index); //skip full line comment
             while(((index) < bufSize) && 
                   ((buffer[index] == '\n' || buffer[index] == '\r') || buffer[index] == ' ')){
@@ -273,7 +321,7 @@ size_t ChangeEndlinesAndBackspacesToNulls_AndSkipComments(char *buffer, size_t b
             continue;
         }
         else if((buffer[index - 1] != '\0') && (buffer[index] == ';')){
-            printf("skip comment after\n");
+            STRHANDLER_DEBUG(printf("skip comment after\n");)
             endlCounter++;
             SkipComments(buffer, &index); //skip comment after instruction line
             while(((index) < bufSize) && 
@@ -304,7 +352,6 @@ size_t ChangeEndlinesAndBackspacesToNulls_AndSkipComments(char *buffer, size_t b
                 index++;
             }
         }
-        printf("endl = %d\n", endlCounter);
     }
 
     return endlCounter;
@@ -330,12 +377,15 @@ void ChangeNullsToEndlines(char *buffer, size_t bufSize){
     }
 }
 
-void CreateArrayOfLines(strInfo_t *env){
+strhandler_errorList CreateArrayOfLines(strInfo_t *env){
     assert(env != NULL);
 
     STRHANDLER_DEBUG(printf("text_proc_create_arr_debug0\n");)
 
     env->arrLines = (line_t *)calloc(env->arrLinesSize, sizeof(line_t));
+    if(env->arrLines == NULL){
+        return STRHANDLER_ERROR_ARRAY_MEMORY_ALLOCATION;
+    }
 
     STRHANDLER_DEBUG(printf("text_proc_create_arr_debug1\n");)
 
@@ -346,6 +396,8 @@ void CreateArrayOfLines(strInfo_t *env){
     GetLensOfLines(env->arrLines, env->arrLinesSize);
 
     STRHANDLER_DEBUG(printf("text_proc_create_arr_debug3\n");)
+    
+    return STRHANDLER_NO_ERROR;
 }
 
 void BufferToLinesFragmentation(line_t *arrLines, char *buffer, size_t bufSize){
@@ -369,14 +421,13 @@ void BufferToLinesFragmentation(line_t *arrLines, char *buffer, size_t bufSize){
 void GetLensOfLines(line_t *arrLines, size_t arrSize){
     assert(arrLines != NULL);
 
-    STRHANDLER_DEBUG(printf("text_proc_create_arr_get_length_debug0\n");)
+    STRHANDLER_DEBUG(printf("text_proc_create_arr_get_length_debug\n");)
     for(size_t index = 0; index < arrSize; index++){
         STRHANDLER_DEBUG(printf("i = [%d]\n", index);)
         STRHANDLER_DEBUG(printf("str[%d] = [%s]\n", index, arrLines[index].line);)
         if(index == (arrSize - 1)){
             STRHANDLER_DEBUG(printf("last str: [%s]\n", arrLines[index].line);)
             arrLines[index].len = strlen(arrLines[index].line);
-            STRHANDLER_DEBUG(printf("text_proc_create_arr_get_length_debug1\n");)
             break;
         }     
         if(arrLines[index].line == 0){
@@ -390,12 +441,20 @@ void GetLensOfLines(line_t *arrLines, size_t arrSize){
 
 
 
-void OutputBuffer(strInfo_t *env){
+strhandler_errorList OutputBuffer(strInfo_t *env){
     assert(env != NULL);
 
     FILE *outText = fopen("output_buffer.txt", "w");
-    fwrite(env->buffer, sizeof(char), env->bufferSize, outText);
+    if(outText == NULL){
+        return STHANDLER_ERROR_OUTPUTBUFFER_OPENFILE;
+    }
+
+    if(fwrite(env->buffer, sizeof(char), env->bufferSize, outText) <= 0){
+        return STRHANDLER_ERROR_OUTPUTBUFFER_WRITE;
+    }
     fclose(outText);
+
+    return STRHANDLER_NO_ERROR;
 }
 
 void StrDump(strInfo_t *env){
