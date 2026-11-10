@@ -32,7 +32,7 @@ enum processor_errorList{
     PROCESSOR_ERROR_INVALID_COMMAND,
     PROCESSOR_ERROR_INVALID_INPUT,
     PROCESSOR_ERROR_ZERO_DIVISION,
-
+    PROCESSOR_ERROR_INVALID_ARGUMENT
 };
 
 enum drawMode{
@@ -43,7 +43,7 @@ enum drawMode{
 };
 
 struct processor_t{
-    stack_t *stackFrame;
+    stack_t *stack;
     stack_t *labelRecursion;
 
     int *code;
@@ -66,6 +66,8 @@ ssize_t GetCodeLen(const char *fileName);
 processor_errorList Processing(processor_t *APM);
 processor_errorList DoInstruction(processor_t *APM);
 processor_errorList ProcessorDestructor(processor_t *APM);
+
+int GetArgument(processor_t *APM);
 
 processor_errorList cmdIN(processor_t *APM);
 processor_errorList cmdOUT(processor_t *APM);
@@ -104,29 +106,28 @@ void _cmdDrawGraphicWindowRGB(processor_t *APM);
 int _cmdFactorial(int num);
 int _cmdFibonacci(int num);
 
-void ProcessorErrorProcessing(processor_errorList err);
+void ProcessorErrorProcessing(processor_errorList err, processor_t *APM);
 
 int main(){
 
     processor_errorList err = PROCESSOR_NO_ERROR;
-
     processor_t APM = {};
 
     err = ProcessorConstructor(&APM, global_windowWidth, global_windowHeight);
     if(err){
-        ProcessorErrorProcessing(err);
+        ProcessorErrorProcessing(err, &APM);
         return 1;
     }
 
     err = LoadFile(&APM, "code.bin");
     if(err){
-        ProcessorErrorProcessing(err);
+        ProcessorErrorProcessing(err, &APM);
         return 1;
     }
 
     err = Processing(&APM);
     if(err){
-        ProcessorErrorProcessing(err);
+        ProcessorErrorProcessing(err, &APM);
         return 1;
     }
 
@@ -147,7 +148,7 @@ processor_errorList ProcessorConstructor(processor_t *APM, const size_t width, c
         return PROCESSOR_ERROR_RAM_ALLOCATION;
     }
 
-    APM->stackFrame = StackConstructor(global_minCapacity, "stackFrame");
+    APM->stack = StackConstructor(global_minCapacity, "stack");
     APM->labelRecursion = StackConstructor(global_minCapacity, "labelRecursion");
 
     return PROCESSOR_NO_ERROR;
@@ -234,8 +235,12 @@ processor_errorList ProcessorDestructor(processor_t *APM){
         free(APM->RAM);
     }    
 
-    StackDestructor(APM->stackFrame);
-    StackDestructor(APM->labelRecursion);
+    if(APM->stack->status == INITIALIZED){
+        StackDestructor(APM->stack);
+    }
+    if(APM->labelRecursion->status == INITIALIZED){
+        StackDestructor(APM->labelRecursion);
+    }
 
     return PROCESSOR_NO_ERROR;
 }
@@ -334,10 +339,15 @@ processor_errorList DoInstruction(processor_t *APM){
     }
 }
 
+int GetArgument(processor_t *APM){
+    return APM->code[APM->IP + 1];
+}
+
 processor_errorList cmdIN(processor_t *APM){
+
     int in = 0;
     if(scanf("%d", &in) == 1){
-        StackPush(APM->stackFrame, in);
+        StackPush(APM->stack, in);
         APM->IP++;
         return PROCESSOR_NO_ERROR;
     }
@@ -347,8 +357,9 @@ processor_errorList cmdIN(processor_t *APM){
 }
 
 processor_errorList cmdOUT(processor_t *APM){   
+
     int out = 0;
-    StackPop(APM->stackFrame, &out);
+    StackPop(APM->stack, &out);
 
     printf("<<%d>>\n", out);
 
@@ -358,7 +369,9 @@ processor_errorList cmdOUT(processor_t *APM){
 }
 
 processor_errorList cmdPUSH(processor_t *APM){
-    StackPush(APM->stackFrame, APM->code[APM->IP + 1]);
+
+    int arg = GetArgument(APM);
+    StackPush(APM->stack, arg);
 
     APM->IP += 2;
 
@@ -367,7 +380,8 @@ processor_errorList cmdPUSH(processor_t *APM){
 
 processor_errorList cmdPUSHR(processor_t *APM){
 
-    StackPush(APM->stackFrame, APM->Registers[APM->code[APM->IP + 1]]);
+    int arg = GetArgument(APM);
+    StackPush(APM->stack, APM->Registers[arg]);
 
     APM->IP += 2;
 
@@ -376,7 +390,8 @@ processor_errorList cmdPUSHR(processor_t *APM){
 
 processor_errorList cmdPOPR(processor_t *APM){
 
-    StackPop(APM->stackFrame, &(APM->Registers[APM->code[APM->IP + 1]]));
+    int arg = GetArgument(APM);
+    StackPop(APM->stack, &(APM->Registers[arg]));
 
     APM->IP += 2;
 
@@ -385,7 +400,8 @@ processor_errorList cmdPOPR(processor_t *APM){
 
 processor_errorList cmdPUSHM(processor_t *APM){
 
-    StackPush(APM->stackFrame, APM->RAM[APM->code[APM->IP + 1]]);
+    int arg = GetArgument(APM);
+    StackPush(APM->stack, APM->RAM[arg]);
 
     APM->IP += 2;
 
@@ -394,7 +410,8 @@ processor_errorList cmdPUSHM(processor_t *APM){
 
 processor_errorList cmdPOPM(processor_t *APM){
 
-    StackPop(APM->stackFrame, &(APM->RAM[APM->code[APM->IP + 1]]));
+    int arg = GetArgument(APM);
+    StackPop(APM->stack, &(APM->RAM[arg]));
 
     APM->IP += 2;
 
@@ -403,7 +420,8 @@ processor_errorList cmdPOPM(processor_t *APM){
 
 processor_errorList cmdPUSHRM(processor_t *APM){
 
-    StackPush(APM->stackFrame, APM->RAM[APM->Registers[APM->code[APM->IP + 1]]]);
+    int arg = GetArgument(APM);
+    StackPush(APM->stack, APM->RAM[APM->Registers[arg]]);
 
     APM->IP += 2;
 
@@ -412,7 +430,8 @@ processor_errorList cmdPUSHRM(processor_t *APM){
 
 processor_errorList cmdPOPRM(processor_t *APM){
 
-    StackPop(APM->stackFrame, &(APM->RAM[APM->Registers[APM->code[APM->IP + 1]]]));
+    int arg = GetArgument(APM);
+    StackPop(APM->stack, &(APM->RAM[APM->Registers[arg]]));
 
     APM->IP += 2;
 
@@ -420,14 +439,15 @@ processor_errorList cmdPOPRM(processor_t *APM){
 }
 
 processor_errorList cmdADD(processor_t *APM){
+
     int elem2 = 0;
-    StackPop(APM->stackFrame, &elem2);
+    StackPop(APM->stack, &elem2);
 
     int elem1 = 0;
-    StackPop(APM->stackFrame, &elem1);
+    StackPop(APM->stack, &elem1);
 
     int add = elem1 + elem2;
-    StackPush(APM->stackFrame, add);
+    StackPush(APM->stack, add);
 
     APM->IP++;
 
@@ -435,14 +455,15 @@ processor_errorList cmdADD(processor_t *APM){
 }
 
 processor_errorList cmdSUB(processor_t *APM){
+
     int elem2 = 0;
-    StackPop(APM->stackFrame, &elem2);
+    StackPop(APM->stack, &elem2);
 
     int elem1 = 0;
-    StackPop(APM->stackFrame, &elem1);
+    StackPop(APM->stack, &elem1);
 
     int sub = elem1 - elem2;
-    StackPush(APM->stackFrame, sub);
+    StackPush(APM->stack, sub);
 
     APM->IP++;
 
@@ -450,14 +471,15 @@ processor_errorList cmdSUB(processor_t *APM){
 }
 
 processor_errorList cmdMUL(processor_t *APM){
+
     int elem2 = 0;
-    StackPop(APM->stackFrame, &elem2);
+    StackPop(APM->stack, &elem2);
 
     int elem1 = 0;
-    StackPop(APM->stackFrame, &elem1);
+    StackPop(APM->stack, &elem1);
 
     int mul = elem1 * elem2;
-    StackPush(APM->stackFrame, mul);
+    StackPush(APM->stack, mul);
 
     APM->IP++;
 
@@ -465,18 +487,19 @@ processor_errorList cmdMUL(processor_t *APM){
 }
 
 processor_errorList cmdDIV(processor_t *APM){
+
     int elem2 = 0;
-    StackPop(APM->stackFrame, &elem2);
+    StackPop(APM->stack, &elem2);
 
     if(elem2 == 0){
         return PROCESSOR_ERROR_ZERO_DIVISION;
     }
 
     int elem1 = 0;
-    StackPop(APM->stackFrame, &elem1);
+    StackPop(APM->stack, &elem1);
 
     int div = elem1 / elem2;
-    StackPush(APM->stackFrame, div);
+    StackPush(APM->stack, div);
 
     APM->IP++;
 
@@ -484,28 +507,39 @@ processor_errorList cmdDIV(processor_t *APM){
 }
 
 processor_errorList cmdPOW(processor_t *APM){
+
+    int arg = GetArgument(APM);
     int elem = 0;
-    StackPop(APM->stackFrame, &elem);
+    StackPop(APM->stack, &elem);
 
     int res = 1;
 
-    for(int i = 0; i < APM->code[APM->IP + 1]; i++){
-        res *= elem;
+    if(arg == 0){
+        StackPush(APM->stack, res);
+        APM->IP += 2;
+        return PROCESSOR_NO_ERROR;
     }
 
-    StackPush(APM->stackFrame, res);
-
-    APM->IP += 2;
-
-    return PROCESSOR_NO_ERROR;
+    if(arg > 0){
+        for(int i = 0; i < arg; i++){
+            res *= elem;
+        }
+        StackPush(APM->stack, res);
+        APM->IP += 2;
+        return PROCESSOR_NO_ERROR;
+    }
+    else{
+        return PROCESSOR_ERROR_INVALID_ARGUMENT;
+    }
 }
 
 processor_errorList cmdSQRT(processor_t *APM){
+    
     int elem = 0;
-    StackPop(APM->stackFrame, &elem);
+    StackPop(APM->stack, &elem);
 
     int res = (int)(sqrt(elem));
-    StackPush(APM->stackFrame, res);
+    StackPush(APM->stack, res);
 
     APM->IP++;
     
@@ -513,20 +547,31 @@ processor_errorList cmdSQRT(processor_t *APM){
 }
 
 processor_errorList cmdJMP(processor_t *APM){
-    APM->IP = APM->code[APM->IP + 1];
+
+    int arg = GetArgument(APM);
+    if(arg < 0){
+        return PROCESSOR_ERROR_INVALID_ARGUMENT;
+    }  
+    APM->IP = arg;
 
     return PROCESSOR_NO_ERROR;
 }
 
 processor_errorList cmdJA(processor_t *APM){
+
+    int arg = GetArgument(APM);
+    if(arg < 0){
+        return PROCESSOR_ERROR_INVALID_ARGUMENT;
+    }
+
     int elem2 = 0;
-    StackPop(APM->stackFrame, &elem2);
+    StackPop(APM->stack, &elem2);
 
     int elem1 = 0;
-    StackPop(APM->stackFrame, &elem1);
+    StackPop(APM->stack, &elem1);
 
     if(elem1 > elem2){
-        APM->IP = APM->code[APM->IP + 1];
+        APM->IP = arg;
     }
     else{
         APM->IP += 2;
@@ -535,14 +580,20 @@ processor_errorList cmdJA(processor_t *APM){
 }
 
 processor_errorList cmdJAE(processor_t *APM){
+
+    int arg = GetArgument(APM);
+    if(arg < 0){
+        return PROCESSOR_ERROR_INVALID_ARGUMENT;
+    }
+
     int elem2 = 0;
-    StackPop(APM->stackFrame, &elem2);
+    StackPop(APM->stack, &elem2);
 
     int elem1 = 0;
-    StackPop(APM->stackFrame, &elem1);
+    StackPop(APM->stack, &elem1);
 
     if(elem1 >= elem2){
-        APM->IP = APM->code[APM->IP + 1];
+        APM->IP = arg;
     }
     else{
         APM->IP += 2;
@@ -551,14 +602,20 @@ processor_errorList cmdJAE(processor_t *APM){
 }
 
 processor_errorList cmdJB(processor_t *APM){
+
+    int arg = GetArgument(APM);
+    if(arg < 0){
+        return PROCESSOR_ERROR_INVALID_ARGUMENT;
+    }
+
     int elem2 = 0;
-    StackPop(APM->stackFrame, &elem2);
+    StackPop(APM->stack, &elem2);
 
     int elem1 = 0;
-    StackPop(APM->stackFrame, &elem1);
+    StackPop(APM->stack, &elem1);
 
     if(elem1 < elem2){
-        APM->IP = APM->code[APM->IP + 1];
+        APM->IP = arg;
     }
     else{
         APM->IP += 2;
@@ -567,14 +624,20 @@ processor_errorList cmdJB(processor_t *APM){
 }
 
 processor_errorList cmdJBE(processor_t *APM){
+
+    int arg = GetArgument(APM);
+    if(arg < 0){
+        return PROCESSOR_ERROR_INVALID_ARGUMENT;
+    }
+
     int elem2 = 0;
-    StackPop(APM->stackFrame, &elem2);
+    StackPop(APM->stack, &elem2);
 
     int elem1 = 0;
-    StackPop(APM->stackFrame, &elem1);
+    StackPop(APM->stack, &elem1);
 
     if(elem1 <= elem2){
-        APM->IP = APM->code[APM->IP + 1];
+        APM->IP = arg;
     }
     else{
         APM->IP += 2;
@@ -583,14 +646,20 @@ processor_errorList cmdJBE(processor_t *APM){
 }
 
 processor_errorList cmdJE(processor_t *APM){
+
+    int arg = GetArgument(APM);
+    if(arg < 0){
+        return PROCESSOR_ERROR_INVALID_ARGUMENT;
+    }
+
     int elem2 = 0;
-    StackPop(APM->stackFrame, &elem2);
+    StackPop(APM->stack, &elem2);
 
     int elem1 = 0;
-    StackPop(APM->stackFrame, &elem1);
+    StackPop(APM->stack, &elem1);
 
     if(elem1 == elem2){
-        APM->IP = APM->code[APM->IP + 1];
+        APM->IP = arg;
     }
     else{
         APM->IP += 2;
@@ -599,14 +668,20 @@ processor_errorList cmdJE(processor_t *APM){
 }
 
 processor_errorList cmdJNE(processor_t *APM){
+
+    int arg = GetArgument(APM);
+    if(arg < 0){
+        return PROCESSOR_ERROR_INVALID_ARGUMENT;
+    }
+
     int elem2 = 0;
-    StackPop(APM->stackFrame, &elem2);
+    StackPop(APM->stack, &elem2);
 
     int elem1 = 0;
-    StackPop(APM->stackFrame, &elem1);
+    StackPop(APM->stack, &elem1);
 
     if(elem1 != elem2){
-        APM->IP = APM->code[APM->IP + 1];
+        APM->IP = arg;
     }
     else{
         APM->IP += 2;
@@ -615,13 +690,17 @@ processor_errorList cmdJNE(processor_t *APM){
 }
 
 processor_errorList cmdJSUN(processor_t *APM){
+
+    int arg = GetArgument(APM);
+    if(arg < 0){
+        return PROCESSOR_ERROR_INVALID_ARGUMENT;
+    }
     
     time_t varTime = time(NULL);
-
     tm *locTime = localtime(&varTime);
     
     if(locTime->tm_wday == 0){
-        APM->IP = APM->code[APM->IP + 1];
+        APM->IP = arg;
     }
     else{
         APM->IP += 2;
@@ -630,22 +709,29 @@ processor_errorList cmdJSUN(processor_t *APM){
 }
 
 processor_errorList cmdDRAW(processor_t *APM){
-    if(APM->code[APM->IP + 1] == consoleBin){
-        _cmdDrawConsoleBin(APM);
-    }
-    if(APM->code[APM->IP + 1] == consoleChar){
-        _cmdDrawConsoleChar(APM);
-    }
-    if(APM->code[APM->IP + 1] == graphicRaylibBW){
-        _cmdDrawGraphicWindowBW(APM);
-    }
-    if(APM->code[APM->IP + 1] == graphicRaylibRGB){
-        _cmdDrawGraphicWindowRGB(APM);
-    }
 
-    APM->IP += 2;
+    int arg = GetArgument(APM);
 
-    return PROCESSOR_NO_ERROR;
+    switch(arg){
+        case consoleBin:
+            _cmdDrawConsoleBin(APM);
+            APM->IP += 2;
+            return PROCESSOR_NO_ERROR;
+        case consoleChar:
+            _cmdDrawConsoleChar(APM);
+            APM->IP += 2;
+            return PROCESSOR_NO_ERROR;
+        case graphicRaylibBW:
+            _cmdDrawGraphicWindowBW(APM);
+            APM->IP += 2;
+            return PROCESSOR_NO_ERROR;
+        case graphicRaylibRGB:
+            _cmdDrawGraphicWindowRGB(APM);
+            APM->IP += 2;
+            return PROCESSOR_NO_ERROR;
+        default:
+            return PROCESSOR_ERROR_INVALID_ARGUMENT;
+    }
 }
 
 processor_errorList cmdCALL(processor_t *APM){
@@ -653,7 +739,10 @@ processor_errorList cmdCALL(processor_t *APM){
     int newIP = APM->IP + 2;
     StackPush(APM->labelRecursion, newIP);
     
-    cmdJMP(APM);
+    processor_errorList err = cmdJMP(APM);
+    if(err){
+        return err;
+    }
 
     return PROCESSOR_NO_ERROR;
 }
@@ -667,10 +756,10 @@ processor_errorList cmdRET(processor_t *APM){
 
 processor_errorList cmdFACT(processor_t *APM){
     int elem = 0;
-    StackPop(APM->stackFrame, &elem);
+    StackPop(APM->stack, &elem);
 
     int fact = _cmdFactorial(elem);
-    StackPush(APM->stackFrame, fact);
+    StackPush(APM->stack, fact);
 
     APM->IP++;
 
@@ -679,10 +768,10 @@ processor_errorList cmdFACT(processor_t *APM){
 
 processor_errorList cmdFIB(processor_t *APM){
     int elem = 0;
-    StackPop(APM->stackFrame, &elem);
+    StackPop(APM->stack, &elem);
 
     int fib = _cmdFibonacci(elem);
-    StackPush(APM->stackFrame, fib);
+    StackPush(APM->stack, fib);
 
     APM->IP++;
 
@@ -765,7 +854,22 @@ int _cmdFibonacci(int num){
     }
 }
 
-void ProcessorErrorProcessing(processor_errorList err){
+void ProcessorErrorProcessing(processor_errorList err, processor_t *APM){
+
+    if(APM->code != NULL){
+        free(APM->code);
+    }
+    if(APM->RAM != NULL){
+        free(APM->RAM);
+    }    
+
+    if(APM->stack->status == INITIALIZED){
+        StackDestructor(APM->stack);
+    }
+    if(APM->labelRecursion->status == INITIALIZED){
+        StackDestructor(APM->labelRecursion);
+    }
+
     switch(err){
         case PROCESSOR_ERROR_BINARY_FREAD:
             fprintf(stderr, "Error in fread in binary file\n");

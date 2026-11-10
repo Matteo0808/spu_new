@@ -88,72 +88,55 @@ assembler_errorList CreateLabel(assembler_t *assembler, const char *str);
 assembler_errorList GetMemoryArg(instruction_t *instruction, const char *str);
 ssize_t GetRegister(const char *str);
 commands GetCommand(command_t *cmds, const char *str);
-commands CheckCmdWithoutArgument(commands cmd);
-commands CheckCmdWithArgument(commands cmd);
 commands CheckLabelCommands(commands cmd);
 commands CheckMemoryCommands(commands cmd);
 
 assembler_errorList TextProcessingAsmWrap(strInfo_t *env, const char *fileInName);
-void AssemblerErrorProcessing(assembler_errorList err);
+void AssemblerErrorProcessing(assembler_errorList err, assembler_t *assembler, strInfo_t *env);
 
 
 
 //TODO - remake binary; COMPLETED
-//TODO - hash !!
-//TODO - comparison in loop to avoid switch !!
-//TODO - binary !!
+//TODO - hash !!; COMPLETED
+//TODO - comparison in loop to avoid switch !!; COMPLETED
+//TODO - binary !!; COMPLETED
 //TODO - func ptrs array
+//TODO - combine proc funcs in macros
 
 int main(int argc, char *argv[]){
 
+    strInfo_t env = {};
+    assembler_t assembler = {};    
+    command_t *cmds = NULL;
     assembler_errorList err = ASSEMBLER_NO_ERROR;
 
     err = CheckConsoleArgument(argc);
     if(err){
-        AssemblerErrorProcessing(err);
+        AssemblerErrorProcessing(err, &assembler, &env);
         return 1;
-    }
-
-    ASSEMBLER_DEBUG(printf("debug0\n");)
-
-    strInfo_t env = {};
+    }    
 
     err = TextProcessingAsmWrap(&env, argv[1]);
     if(err){
-        AssemblerErrorProcessing(err);
+        AssemblerErrorProcessing(err, &assembler, &env);
         return 1;
     }
-
-    ASSEMBLER_DEBUG(printf("debug1\n");)
-
-    assembler_t assembler = {};    
-    command_t *cmds = NULL;    
-
-    ASSEMBLER_DEBUG(printf("debug2\n");)
 
     err = AssemblerConstructor(&assembler, &cmds, env.arrLinesSize, global_labelSize);
     if(err){
-        AssemblerErrorProcessing(err);
+        AssemblerErrorProcessing(err, &assembler, &env);
         return 1;
     }
-
-    ASSEMBLER_DEBUG(printf("debug3\n");)
 
     err = DoubleAssembling(&assembler, &env, cmds);
     if(err){
-        AssemblerErrorProcessing(err);
+        AssemblerErrorProcessing(err, &assembler, &env);
         return 1;
     }
 
-    ASSEMBLER_DEBUG(printf("debug4\n");)
-
     AssemblerDestructor(&assembler);
 
-    ASSEMBLER_DEBUG(printf("debug5\n");)
-
     StrInfoDestructor(&env);
-    
-    ASSEMBLER_DEBUG(printf("debug6\n");)
 }
 
 assembler_errorList CheckConsoleArgument(int argc){
@@ -686,7 +669,16 @@ assembler_errorList TextProcessingAsmWrap(strInfo_t *env, const char *fileInName
     return ASSEMBLER_NO_ERROR;
 }
 
-void AssemblerErrorProcessing(assembler_errorList err){
+void AssemblerErrorProcessing(assembler_errorList err, assembler_t *assembler, strInfo_t *env){
+    if(assembler->byteCode != NULL){
+        free(assembler->byteCode);
+    }
+    if(assembler->labels != NULL){
+        free(assembler->labels);
+    }
+    if(env->buffer != NULL){
+        free(env->buffer);
+    }
     switch(err){
         case ASSEMBLER_ERROR_BINARY_FWRITE:
             fprintf(stderr, "Error in writing in binary file\n");
