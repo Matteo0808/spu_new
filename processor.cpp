@@ -12,8 +12,8 @@
     #define PROCESSOR_DEBUG(...)
 #endif
 
-#include "stack.hpp"
 #include "config.hpp"
+#include "stack.hpp"
 
 const size_t global_VRAMptr = 64;
 const size_t global_windowWidth = 1280;
@@ -46,13 +46,13 @@ struct processor_t{
     stack_t *stack;
     stack_t *labelRecursion;
 
-    int *code;
+    elem_t *code;
     size_t codeLen;
     int IP;
 
     int Registers[4];
 
-    int *RAM;
+    elem_t *RAM;
     size_t VRAMptr;
     size_t width;
     size_t height;
@@ -67,7 +67,7 @@ processor_errorList Processing(processor_t *APM);
 processor_errorList DoInstruction(processor_t *APM);
 processor_errorList ProcessorDestructor(processor_t *APM);
 
-int GetArgument(processor_t *APM);
+elem_t GetArgument(processor_t *APM);
 
 processor_errorList cmdIN(processor_t *APM);
 processor_errorList cmdOUT(processor_t *APM);
@@ -116,24 +116,24 @@ int main(){
     err = ProcessorConstructor(&APM, global_windowWidth, global_windowHeight);
     if(err){
         ProcessorErrorProcessing(err, &APM);
-        return 1;
+        return RETURN_ERROR;
     }
 
     err = LoadFile(&APM, "code.bin");
     if(err){
         ProcessorErrorProcessing(err, &APM);
-        return 1;
+        return RETURN_ERROR;
     }
 
     err = Processing(&APM);
     if(err){
         ProcessorErrorProcessing(err, &APM);
-        return 1;
+        return RETURN_ERROR;
     }
 
     ProcessorDestructor(&APM);
 
-    return 0;
+    return RETURN_SUCCESS;
 }
 
 processor_errorList ProcessorConstructor(processor_t *APM, const size_t width, const size_t height){
@@ -143,7 +143,7 @@ processor_errorList ProcessorConstructor(processor_t *APM, const size_t width, c
     APM->width = width;
     APM->height = height;
 
-    APM->RAM = (int *)calloc(APM->VRAMptr + APM->width * APM->height, sizeof(int));
+    APM->RAM = (elem_t *)calloc(APM->VRAMptr + APM->width * APM->height, sizeof(elem_t));
     if(APM->RAM == NULL){
         return PROCESSOR_ERROR_RAM_ALLOCATION;
     }
@@ -163,7 +163,7 @@ processor_errorList LoadFile(processor_t *APM, const char *fileInName){
         return PROCESSOR_ERROR_FILESIZE;
     }
 
-    APM->code = (int *)calloc(APM->codeLen, sizeof(int));
+    APM->code = (elem_t *)calloc(APM->codeLen, sizeof(elem_t));
     if(APM->code == NULL){
         return PROCESSOR_ERROR_CODE_ALLOCATION;
     }
@@ -178,7 +178,7 @@ processor_errorList LoadFile(processor_t *APM, const char *fileInName){
         return PROCESSOR_ERROR_BINARY_FSEEK;
     }
 
-    if(fread(APM->code, sizeof(int), APM->codeLen, binaryFp) <= 0){
+    if(fread(APM->code, sizeof(elem_t), APM->codeLen, binaryFp) <= 0){
         fclose(binaryFp);
         return PROCESSOR_ERROR_BINARY_FREAD;
     }
@@ -197,7 +197,7 @@ ssize_t GetCodeLen(const char *fileName){
         return -1;
     }
 
-    return (fileStat.st_size - global_signatureLength) / sizeof(int);
+    return (fileStat.st_size - global_signatureLength) / sizeof(elem_t);
 }
 
 processor_errorList Processing(processor_t *APM){
@@ -345,8 +345,8 @@ int GetArgument(processor_t *APM){
 
 processor_errorList cmdIN(processor_t *APM){
 
-    int in = 0;
-    if(scanf("%d", &in) == 1){
+    elem_t in = 0;
+    if(scanf("%d", &in) == 1){    // for typedef int elem_t
         StackPush(APM->stack, in);
         APM->IP++;
         return PROCESSOR_NO_ERROR;
@@ -358,10 +358,10 @@ processor_errorList cmdIN(processor_t *APM){
 
 processor_errorList cmdOUT(processor_t *APM){   
 
-    int out = 0;
+    elem_t out = 0;
     StackPop(APM->stack, &out);
 
-    printf("<<%d>>\n", out);
+    printf("<<%d>>\n", out); // for typedef int elem_t
 
     APM->IP++;
 
@@ -370,7 +370,7 @@ processor_errorList cmdOUT(processor_t *APM){
 
 processor_errorList cmdPUSH(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     StackPush(APM->stack, arg);
 
     APM->IP += 2;
@@ -380,7 +380,7 @@ processor_errorList cmdPUSH(processor_t *APM){
 
 processor_errorList cmdPUSHR(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     StackPush(APM->stack, APM->Registers[arg]);
 
     APM->IP += 2;
@@ -390,7 +390,7 @@ processor_errorList cmdPUSHR(processor_t *APM){
 
 processor_errorList cmdPOPR(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     StackPop(APM->stack, &(APM->Registers[arg]));
 
     APM->IP += 2;
@@ -400,7 +400,7 @@ processor_errorList cmdPOPR(processor_t *APM){
 
 processor_errorList cmdPUSHM(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     StackPush(APM->stack, APM->RAM[arg]);
 
     APM->IP += 2;
@@ -410,7 +410,7 @@ processor_errorList cmdPUSHM(processor_t *APM){
 
 processor_errorList cmdPOPM(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     StackPop(APM->stack, &(APM->RAM[arg]));
 
     APM->IP += 2;
@@ -420,7 +420,7 @@ processor_errorList cmdPOPM(processor_t *APM){
 
 processor_errorList cmdPUSHRM(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     StackPush(APM->stack, APM->RAM[APM->Registers[arg]]);
 
     APM->IP += 2;
@@ -430,7 +430,7 @@ processor_errorList cmdPUSHRM(processor_t *APM){
 
 processor_errorList cmdPOPRM(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     StackPop(APM->stack, &(APM->RAM[APM->Registers[arg]]));
 
     APM->IP += 2;
@@ -440,13 +440,13 @@ processor_errorList cmdPOPRM(processor_t *APM){
 
 processor_errorList cmdADD(processor_t *APM){
 
-    int elem2 = 0;
+    elem_t elem2 = 0;
     StackPop(APM->stack, &elem2);
 
-    int elem1 = 0;
+    elem_t elem1 = 0;
     StackPop(APM->stack, &elem1);
 
-    int add = elem1 + elem2;
+    elem_t add = elem1 + elem2;
     StackPush(APM->stack, add);
 
     APM->IP++;
@@ -456,13 +456,13 @@ processor_errorList cmdADD(processor_t *APM){
 
 processor_errorList cmdSUB(processor_t *APM){
 
-    int elem2 = 0;
+    elem_t elem2 = 0;
     StackPop(APM->stack, &elem2);
 
-    int elem1 = 0;
+    elem_t elem1 = 0;
     StackPop(APM->stack, &elem1);
 
-    int sub = elem1 - elem2;
+    elem_t sub = elem1 - elem2;
     StackPush(APM->stack, sub);
 
     APM->IP++;
@@ -472,13 +472,13 @@ processor_errorList cmdSUB(processor_t *APM){
 
 processor_errorList cmdMUL(processor_t *APM){
 
-    int elem2 = 0;
+    elem_t elem2 = 0;
     StackPop(APM->stack, &elem2);
 
-    int elem1 = 0;
+    elem_t elem1 = 0;
     StackPop(APM->stack, &elem1);
 
-    int mul = elem1 * elem2;
+    elem_t mul = elem1 * elem2;
     StackPush(APM->stack, mul);
 
     APM->IP++;
@@ -488,17 +488,17 @@ processor_errorList cmdMUL(processor_t *APM){
 
 processor_errorList cmdDIV(processor_t *APM){
 
-    int elem2 = 0;
+    elem_t elem2 = 0;
     StackPop(APM->stack, &elem2);
 
     if(elem2 == 0){
         return PROCESSOR_ERROR_ZERO_DIVISION;
     }
 
-    int elem1 = 0;
+    elem_t elem1 = 0;
     StackPop(APM->stack, &elem1);
 
-    int div = elem1 / elem2;
+    elem_t div = elem1 / elem2;
     StackPush(APM->stack, div);
 
     APM->IP++;
@@ -508,11 +508,11 @@ processor_errorList cmdDIV(processor_t *APM){
 
 processor_errorList cmdPOW(processor_t *APM){
 
-    int arg = GetArgument(APM);
-    int elem = 0;
+    elem_t arg = GetArgument(APM);
+    elem_t elem = 0;
     StackPop(APM->stack, &elem);
 
-    int res = 1;
+    elem_t res = 1;
 
     if(arg == 0){
         StackPush(APM->stack, res);
@@ -521,7 +521,7 @@ processor_errorList cmdPOW(processor_t *APM){
     }
 
     if(arg > 0){
-        for(int i = 0; i < arg; i++){
+        for(size_t i = 0; i < arg; i++){
             res *= elem;
         }
         StackPush(APM->stack, res);
@@ -535,10 +535,10 @@ processor_errorList cmdPOW(processor_t *APM){
 
 processor_errorList cmdSQRT(processor_t *APM){
     
-    int elem = 0;
+    elem_t elem = 0;
     StackPop(APM->stack, &elem);
 
-    int res = (int)(sqrt(elem));
+    elem_t res = (elem_t)(sqrt(elem));
     StackPush(APM->stack, res);
 
     APM->IP++;
@@ -548,7 +548,7 @@ processor_errorList cmdSQRT(processor_t *APM){
 
 processor_errorList cmdJMP(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     if(arg < 0){
         return PROCESSOR_ERROR_INVALID_ARGUMENT;
     }  
@@ -559,15 +559,15 @@ processor_errorList cmdJMP(processor_t *APM){
 
 processor_errorList cmdJA(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     if(arg < 0){
         return PROCESSOR_ERROR_INVALID_ARGUMENT;
     }
 
-    int elem2 = 0;
+    elem_t elem2 = 0;
     StackPop(APM->stack, &elem2);
 
-    int elem1 = 0;
+    elem_t elem1 = 0;
     StackPop(APM->stack, &elem1);
 
     if(elem1 > elem2){
@@ -581,15 +581,15 @@ processor_errorList cmdJA(processor_t *APM){
 
 processor_errorList cmdJAE(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     if(arg < 0){
         return PROCESSOR_ERROR_INVALID_ARGUMENT;
     }
 
-    int elem2 = 0;
+    elem_t elem2 = 0;
     StackPop(APM->stack, &elem2);
 
-    int elem1 = 0;
+    elem_t elem1 = 0;
     StackPop(APM->stack, &elem1);
 
     if(elem1 >= elem2){
@@ -603,15 +603,15 @@ processor_errorList cmdJAE(processor_t *APM){
 
 processor_errorList cmdJB(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     if(arg < 0){
         return PROCESSOR_ERROR_INVALID_ARGUMENT;
     }
 
-    int elem2 = 0;
+    elem_t elem2 = 0;
     StackPop(APM->stack, &elem2);
 
-    int elem1 = 0;
+    elem_t elem1 = 0;
     StackPop(APM->stack, &elem1);
 
     if(elem1 < elem2){
@@ -625,15 +625,15 @@ processor_errorList cmdJB(processor_t *APM){
 
 processor_errorList cmdJBE(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     if(arg < 0){
         return PROCESSOR_ERROR_INVALID_ARGUMENT;
     }
 
-    int elem2 = 0;
+    elem_t elem2 = 0;
     StackPop(APM->stack, &elem2);
 
-    int elem1 = 0;
+    elem_t elem1 = 0;
     StackPop(APM->stack, &elem1);
 
     if(elem1 <= elem2){
@@ -647,15 +647,15 @@ processor_errorList cmdJBE(processor_t *APM){
 
 processor_errorList cmdJE(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     if(arg < 0){
         return PROCESSOR_ERROR_INVALID_ARGUMENT;
     }
 
-    int elem2 = 0;
+    elem_t elem2 = 0;
     StackPop(APM->stack, &elem2);
 
-    int elem1 = 0;
+    elem_t elem1 = 0;
     StackPop(APM->stack, &elem1);
 
     if(elem1 == elem2){
@@ -669,15 +669,15 @@ processor_errorList cmdJE(processor_t *APM){
 
 processor_errorList cmdJNE(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     if(arg < 0){
         return PROCESSOR_ERROR_INVALID_ARGUMENT;
     }
 
-    int elem2 = 0;
+    elem_t elem2 = 0;
     StackPop(APM->stack, &elem2);
 
-    int elem1 = 0;
+    elem_t elem1 = 0;
     StackPop(APM->stack, &elem1);
 
     if(elem1 != elem2){
@@ -691,7 +691,7 @@ processor_errorList cmdJNE(processor_t *APM){
 
 processor_errorList cmdJSUN(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
     if(arg < 0){
         return PROCESSOR_ERROR_INVALID_ARGUMENT;
     }
@@ -710,7 +710,7 @@ processor_errorList cmdJSUN(processor_t *APM){
 
 processor_errorList cmdDRAW(processor_t *APM){
 
-    int arg = GetArgument(APM);
+    elem_t arg = GetArgument(APM);
 
     switch(arg){
         case consoleBin:
@@ -755,10 +755,10 @@ processor_errorList cmdRET(processor_t *APM){
 }
 
 processor_errorList cmdFACT(processor_t *APM){
-    int elem = 0;
+    elem_t elem = 0;
     StackPop(APM->stack, &elem);
 
-    int fact = _cmdFactorial(elem);
+    elem_t fact = (elem_t)_cmdFactorial(elem);
     StackPush(APM->stack, fact);
 
     APM->IP++;
@@ -767,10 +767,10 @@ processor_errorList cmdFACT(processor_t *APM){
 }
 
 processor_errorList cmdFIB(processor_t *APM){
-    int elem = 0;
+    elem_t elem = 0;
     StackPop(APM->stack, &elem);
 
-    int fib = _cmdFibonacci(elem);
+    elem_t fib = _cmdFibonacci(elem);
     StackPush(APM->stack, fib);
 
     APM->IP++;
@@ -779,8 +779,8 @@ processor_errorList cmdFIB(processor_t *APM){
 }
 
 void _cmdDrawConsoleBin(processor_t *APM){
-    for(int  i = 0; i < APM->height; i++){
-        for(int j = 0; j < APM->width; j++){
+    for(size_t  i = 0; i < APM->height; i++){
+        for(size_t j = 0; j < APM->width; j++){
             if(APM->RAM[APM->VRAMptr + APM->width * i + j] == 0){            
                 printf(".");
             }
@@ -794,8 +794,8 @@ void _cmdDrawConsoleBin(processor_t *APM){
 }
 
 void _cmdDrawConsoleChar(processor_t *APM){
-    for(int  i = 0; i < APM->height; i++){
-        for(int j = 0; j < APM->width; j++){
+    for(size_t  i = 0; i < APM->height; i++){
+        for(size_t j = 0; j < APM->width; j++){
             printf("%c", APM->RAM[APM->VRAMptr + APM->width * i + j]);
         }
         printf("\n");
@@ -809,8 +809,8 @@ void _cmdDrawGraphicWindowBW(processor_t *APM){
 
             ClearBackground(RAYWHITE);
 
-            for(int y = 0; y < APM->height; y++){
-                for(int x = 0; x < APM->width; x++){
+            for(size_t y = 0; y < APM->height; y++){
+                for(size_t x = 0; x < APM->width; x++){
                     if(APM->RAM[global_VRAMptr + y * APM->width + x] == 67){
                         DrawPixel(x, y, WHITE);
                     }

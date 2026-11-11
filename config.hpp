@@ -1,8 +1,15 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+typedef int elem_t;
+
 const int global_signatureLength = 4;
 const char global_signature[4] = {'M', 'M', 'A', '\0'};
+
+enum returns{
+    RETURN_SUCCESS = 0,
+    RETURN_ERROR = 1,
+};
 
 enum commands{
     cmdError = -1,

@@ -53,8 +53,8 @@ enum stack_status{
 };
 
 enum ErrorSuccess{
-    RETURN_SUCCESS = 0,
-    RETURN_ERROR = 1
+    RETURN_SUCCESS_STACK = 0,
+    RETURN_ERROR_STACK = 1
 };
 
 enum stackErrorList{
@@ -263,7 +263,7 @@ stack_t *_StackConstructor(ssize_t capacity,
 
 #endif
 
-    ErrorSuccess err = RETURN_SUCCESS;
+    ErrorSuccess err = RETURN_SUCCESS_STACK;
 
     err = _StackVerify(stk, crFile, crFunc, crLine);
     
@@ -283,9 +283,9 @@ ErrorSuccess _StackVerify(const stack_t *stk, const char *verFile, const char *v
     if(error){
         _StackDump(stk, error, verFile, verFunc, verLine);
         exit(1);
-        return RETURN_ERROR;
+        return RETURN_ERROR_STACK;
     }
-    return RETURN_SUCCESS;
+    return RETURN_SUCCESS_STACK;
 }
 
 stackErrorList StackCheckErrors(const stack_t *stk){
@@ -590,7 +590,7 @@ const char *GetLineError(stackErrorList error){
 
 void _StackPush(stack_t *stk, stackType elem, const char *callFile, const char *callFunc, ssize_t callLine){
     
-    ErrorSuccess err = RETURN_SUCCESS;
+    ErrorSuccess err = RETURN_SUCCESS_STACK;
 
     err = _StackVerify(stk, callFile, callFunc, callLine);
     
@@ -625,7 +625,7 @@ void _StackPush(stack_t *stk, stackType elem, const char *callFile, const char *
 
 void _StackPop(stack_t *stk, stackType *elem, const char *callFile, const char *callFunc, ssize_t callLine){
     
-    ErrorSuccess err = RETURN_SUCCESS;
+    ErrorSuccess err = RETURN_SUCCESS_STACK;
     
     err = _StackVerify(stk, callFile, callFunc, callLine);
     if(stk->size <= 0){
@@ -676,7 +676,7 @@ void _StackPop(stack_t *stk, stackType *elem, const char *callFile, const char *
 
 void _StackDestructor(stack_t *stk, const char *callFile, const char *callFunc, ssize_t callLine){
     
-    ErrorSuccess err = RETURN_SUCCESS;
+    ErrorSuccess err = RETURN_SUCCESS_STACK;
 
     err = _StackVerify(stk, callFile, callFunc, callLine);
     
@@ -711,7 +711,7 @@ void _StackDestructor(stack_t *stk, const char *callFile, const char *callFunc, 
 
 void StackResizeUp(stack_t *stk, const char *callFile, const char *callFunc, ssize_t callLine){
     
-    ErrorSuccess err = RETURN_SUCCESS;
+    ErrorSuccess err = RETURN_SUCCESS_STACK;
 
     err = _StackVerify(stk, callFile, callFunc, callLine);
     
@@ -779,7 +779,7 @@ void StackResizeUp(stack_t *stk, const char *callFile, const char *callFunc, ssi
 
 void StackResizeDown(stack_t *stk, const char *callFile, const char *callFunc, ssize_t callLine){
     
-    ErrorSuccess err = RETURN_SUCCESS;
+    ErrorSuccess err = RETURN_SUCCESS_STACK;
 
     err = _StackVerify(stk, callFile, callFunc, callLine);
     
@@ -850,7 +850,7 @@ void StackResizeDown(stack_t *stk, const char *callFile, const char *callFunc, s
 
 void _StackPrintf(const stack_t *stk, const char *callFile, const char *callFunc, ssize_t callLine){
     
-    ErrorSuccess err = RETURN_SUCCESS;
+    ErrorSuccess err = RETURN_SUCCESS_STACK;
 
     err = _StackVerify(stk, callFile, callFunc, callLine);
 

@@ -14,6 +14,8 @@
 #include "config.hpp"
 #include "strhandler.hpp"
 
+
+
 const size_t global_labelSize = 16;
 const size_t global_cmdNumber = 30 - 6;
 
@@ -41,13 +43,13 @@ enum number_of_args{
 };
 
 struct label_t{
-    const char *labelName; //TODO - 
+    const char *labelName;
     ssize_t number;
     ssize_t hash;
 };
 
 struct assembler_t{
-    int *byteCode;
+    elem_t *byteCode;
     size_t byteCodeLen;
     size_t IP;
 
@@ -102,6 +104,9 @@ void AssemblerErrorProcessing(assembler_errorList err, assembler_t *assembler, s
 //TODO - binary !!; COMPLETED
 //TODO - func ptrs array
 //TODO - combine proc funcs in macros
+//TODO - rele coding
+//TODO - delta coding
+//TODO - new year holidays == BAD APPLE == 
 
 int main(int argc, char *argv[]){
 
@@ -113,30 +118,32 @@ int main(int argc, char *argv[]){
     err = CheckConsoleArgument(argc);
     if(err){
         AssemblerErrorProcessing(err, &assembler, &env);
-        return 1;
-    }    
+        return RETURN_ERROR;
+    }
 
     err = TextProcessingAsmWrap(&env, argv[1]);
     if(err){
         AssemblerErrorProcessing(err, &assembler, &env);
-        return 1;
+        return RETURN_ERROR;
     }
 
     err = AssemblerConstructor(&assembler, &cmds, env.arrLinesSize, global_labelSize);
     if(err){
         AssemblerErrorProcessing(err, &assembler, &env);
-        return 1;
+        return RETURN_ERROR;
     }
 
     err = DoubleAssembling(&assembler, &env, cmds);
     if(err){
         AssemblerErrorProcessing(err, &assembler, &env);
-        return 1;
+        return RETURN_ERROR;
     }
 
     AssemblerDestructor(&assembler);
 
     StrInfoDestructor(&env);
+
+    return RETURN_SUCCESS;
 }
 
 assembler_errorList CheckConsoleArgument(int argc){
@@ -154,7 +161,7 @@ assembler_errorList AssemblerConstructor(assembler_t *assembler, command_t **cmd
     assert(labelSize != 0);
 
     assembler->byteCodeLen = lines * 2;
-    assembler->byteCode = (int *)calloc(assembler->byteCodeLen, sizeof(int));
+    assembler->byteCode = (elem_t *)calloc(assembler->byteCodeLen, sizeof(elem_t));
     
     if(assembler->byteCode == NULL){
         return ASSEMBLER_ERROR_BYTECODE_MEMORY_ALLOCATION;
@@ -262,7 +269,7 @@ assembler_errorList DoubleAssembling(assembler_t *assembler, strInfo_t *env, com
 ASSEMBLER_DEBUG(
     printf("byteCodeLen = %lld\n", assembler->byteCodeLen);
     for (size_t i = 0; i < assembler->byteCodeLen; i++){
-        printf("%d ", assembler->byteCode[i]);
+        printf("%d ", assembler->byteCode[i]); // for typedef int elem_t
     }
     printf("\n");
 )
@@ -287,7 +294,7 @@ assembler_errorList CreateBinary(assembler_t *assembler){
         return ASSEMBLER_ERROR_BINARY_FWRITE_SIGNATURE;
      }
 
-    if(fwrite(assembler->byteCode, sizeof(int), assembler->byteCodeLen, fileOut) <= 0){
+    if(fwrite(assembler->byteCode, sizeof(elem_t), assembler->byteCodeLen, fileOut) <= 0){
         fclose(fileOut);
         return ASSEMBLER_ERROR_BINARY_FWRITE;;
     }
@@ -330,8 +337,8 @@ assembler_errorList Assembling(assembler_t *assembler, strInfo_t *env, command_t
 
         number_of_args checkCmd = IsCommand(assembler, &instruction, cmds, env->arrLines[index].line);
 
-        ASSEMBLER_DEBUG(printf("check cmd = [%d]\n", (int)checkCmd);)
-        ASSEMBLER_DEBUG(printf("cmd = [%d]\n", (int)instruction.cmd);)
+        ASSEMBLER_DEBUG(printf("check cmd = [%d]\n", (elem_t)checkCmd);) // for typedef int elem_t
+        ASSEMBLER_DEBUG(printf("cmd = [%d]\n", (elem_t)instruction.cmd);)// for typedef int elem_t
         if(checkCmd != NOT_A_CMD){
             if(checkCmd == ONE_ARG){
                 ASSEMBLER_DEBUG(printf("case 1 arg:\n");)
@@ -341,11 +348,11 @@ assembler_errorList Assembling(assembler_t *assembler, strInfo_t *env, command_t
                     return err;
                 }
 
-                ASSEMBLER_DEBUG(printf("cmd = <%d>\n", (int)instruction.cmd);)
+                ASSEMBLER_DEBUG(printf("cmd = <%d>\n", (elem_t)instruction.cmd);) // for typedef int elem_t
                 ASSEMBLER_DEBUG(printf("arg = <%lld>\n", instruction.arg);)
 
-                assembler->byteCode[assembler->IP] = (int)instruction.cmd;
-                assembler->byteCode[assembler->IP + 1] = (int)instruction.arg;
+                assembler->byteCode[assembler->IP] = (elem_t)instruction.cmd;
+                assembler->byteCode[assembler->IP + 1] = (elem_t)instruction.arg;
                 assembler->IP += 2;
 
                 index++;
@@ -355,9 +362,9 @@ assembler_errorList Assembling(assembler_t *assembler, strInfo_t *env, command_t
             else if(checkCmd == NO_ARGS){
                 ASSEMBLER_DEBUG(printf("case 0 arg:\n");)
 
-                ASSEMBLER_DEBUG(printf("cmd = <%d>\n", (int)instruction.cmd);)
+                ASSEMBLER_DEBUG(printf("cmd = <%d>\n", (elem_t)instruction.cmd);) // for typedef int elem_t
 
-                assembler->byteCode[assembler->IP] = (int)instruction.cmd;
+                assembler->byteCode[assembler->IP] = (elem_t)instruction.cmd;
                 assembler->IP++;
                 
                 continue;
@@ -429,14 +436,12 @@ assembler_errorList GetArgument(assembler_t *assembler, instruction_t *instructi
     assert(instruction != NULL);
     assert(str != NULL);
     
-    int tempInt = 0;
-
+    elem_t tempInt = 0;
     assembler_errorList err = ASSEMBLER_NO_ERROR;
-
 
     ASSEMBLER_DEBUG(printf("str in get arg = [%s]\n", str);)
 
-    if(sscanf(str, "%d", &tempInt) == 1){
+    if(sscanf(str, "%d", &tempInt) == 1){ // for typedef int elem_t
         ASSEMBLER_DEBUG(printf("case number:\n");)
         instruction->arg = tempInt;
         return ASSEMBLER_NO_ERROR;
@@ -542,17 +547,17 @@ assembler_errorList GetMemoryArg(instruction_t *instruction, const char *str){
     assert(instruction != NULL);
     assert(str != NULL);
 
-    int tempInt = 0;
+    elem_t tempInt = 0;
     char tempChr = 0;
 
-    int check = sscanf(str, "%d]%c", &tempInt, &tempChr);
+    int check = sscanf(str, "%d]%c", &tempInt, &tempChr); // for typedef int elem_t
     if(check == 2){
         return ASSEMBLER_ERROR_INVALID_INSTRUCTION;
     }
     else if(check == 1){
         instruction->arg = tempInt;
 
-        ASSEMBLER_DEBUG(printf("cmd mem = %d\n", instruction->cmd);)
+        ASSEMBLER_DEBUG(printf("cmd mem = %d\n", instruction->cmd);)// for typedef int elem_t
         ASSEMBLER_DEBUG(printf("arg mem = %lld\n", instruction->arg);)
 
         if(instruction->cmd == PUSH){
@@ -628,37 +633,24 @@ commands GetCommand(command_t *cmds, const char *str){
 
 commands CheckLabelCommands(commands cmd){
     switch(cmd){
-        case JMP:
-            return JMP;
-        case JA:
-            return JA;
-        case JAE:
-            return JAE;
-        case JB:
-            return JBE;
-        case JBE:
-            return JBE;
-        case JE:
-            return JE;
-        case JNE:
-            return JNE;
-        case JSUN:
-            return JSUN;
-        case CALL:
-            return CALL;
-        default:
-            return cmdError;
+        case JMP:     return JMP;
+        case JA:       return JA;
+        case JAE:     return JAE;
+        case JB:      return JBE;
+        case JBE:     return JBE;
+        case JE:       return JE;
+        case JNE:     return JNE;
+        case JSUN:   return JSUN;
+        case CALL:   return CALL;
+        default: return cmdError;
     }
 }
 
 commands CheckMemoryCommands(commands cmd){
     switch(cmd){
-        case PUSH:
-            return PUSH;            
-        case POP:
-            return POP;
-        default:
-            return cmdError;
+        case PUSH:   return PUSH;            
+        case POP:     return POP;
+        default: return cmdError;
     }
 }
 
